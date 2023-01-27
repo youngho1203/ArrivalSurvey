@@ -187,9 +187,9 @@ function setDormitoryInfo(residenceType, studentInfo) {
       }
       else {
         //
-        // 각 dormitory 의 단위 요금 * 거주 기간 = 기숙사 비
+        // 기본 요금 + 각 dormitory 의 단위 요금 * 거주 기간 = 기숙사 비
         //        
-        studentInfo.dormFee = residenceInfo.numberOfMonth * roomInfo[3];
+        studentInfo.dormFee = residenceInfo.defaultFee + residenceInfo.numberOfMonth * roomInfo[3];
       }
       // 
       studentInfo.dormName = roomInfo[0];
