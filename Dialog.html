@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+  <script>
+    function submitForm() {
+      google.script.run.getDataFromFormSubmit(document.getElementById("myform"));
+      google.script.host.close();
+    }
+  </script>
+</head>
+<body>
+  <div id="form">
+  <form id="myform" class="w3-container">
+    <div>
+    <label for="name" class="w3-text">학 번</label>
+    <input type="text" id="studentId" name="studentId" class="w3-input w3-border">
+    <label for="code" class="w3-text">방배정</label>
+    <input type="text" id="code" name="code" class="w3-input w3-border">
+    </div>
+    <div class="w3-panel">
+    <input type="button" value="Submit" class="w3-btn w3-blue" onclick="submitForm();">
+    </div>
+  </form>
+  </div>
+</body>
+</html>
