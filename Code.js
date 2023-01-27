@@ -165,6 +165,7 @@ function setRoomNumberCode(studentInfo) {
 function setDormitoryInfo(residenceType, studentInfo) {
   // 기숙사 거주 유형별 정보
   const residenceInfo = getResidenceInfo(residenceType);
+  // console.log('residenceInfo', residenceInfo);
   //
   // 침대는 최대 9개 미만 ( 알파벳 한자리 )
   var str_length = studentInfo.assignedRoom.length;
@@ -173,7 +174,9 @@ function setDormitoryInfo(residenceType, studentInfo) {
     // white space 제거, human error 를 방지
     if(room[0].toString().replace(/\s/g, "") == roomNumber.replace(/\s/g, "")){
       var roomInfo = configSheet.getRange("A" + (2 + index) + ":D" + (2 + index)).getValues()[0];
+      console.log('roomInfo', roomInfo);
       /** 
+       * roomInfo array
        * 'Domitory Name',	
        * 'Available Rooms',	
        * 'Beds'
@@ -186,7 +189,7 @@ function setDormitoryInfo(residenceType, studentInfo) {
         //
         // 각 dormitory 의 단위 요금 * 거주 기간 = 기숙사 비
         //        
-        studentInfo.dormFee = residenceInfo.defaultFee + residenceInfo.numberOfMonth * roomInfo[3];
+        studentInfo.dormFee = residenceInfo.numberOfMonth * roomInfo[3];
       }
       // 
       studentInfo.dormName = roomInfo[0];
@@ -266,7 +269,7 @@ function getResidenceInfo(residenceType) {
   let residencePeriod = residenceInfo[3].split('~');
   return {
     'type': residenceInfo[0],
-    'numberOfMonth': residenceInfo[2], // 거주 개월수
+    'numberOfMonth': residenceInfo[2],
     'availableDate': residencePeriod[0],
     'dueDate' : residencePeriod[1],
     'paymentPeriod':residenceInfo[4],
