@@ -26,17 +26,24 @@ const numberOfData = dataSheet.getLastRow() - 1;
 const availableRooms = configSheet.getLastRow() -1;
 // configSheet 에서 nextRoomCode Column number
 const nextRoomCodeColumn = 8;
+// 입실 가능한 방이 꽉 찼을 때 
+const FULL_ROOMS = "FULL";
 
 /**
  * Arrival Survey 가 등록되면 실행된다.
  * @param {Object} survey event object
  */
 function setInitialValue(e) {
-  var range = e.range.offset(0,1, 1, 1);
-  var studentId = range.getValue();
-  var studentInfo = getStudentInfo(studentId);
-  //
-  doBuild(range, studentInfo, 'A');
+  try {
+    var range = e.range.offset(0,1, 1, 1);
+    var studentId = range.getValue();
+    var studentInfo = getStudentInfo(studentId);
+    //
+    doBuild(range, studentInfo, 'A');
+  }
+  catch(e) {
+    range.offset(0, 6, 1, 1).setValue(e);
+  }
 }
 
 /**
@@ -68,7 +75,7 @@ function buildInvoidByManual(studentId, roomCode){
     // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
     //
-    dataSheet.getRange("A2:A" + (2 + numberOfData)).getValues().forEach((value, index) => {
+    dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
       // why array ????
       if(value[0] == studentId){
         dataSheet.getRange(index + 2, 7).setValue(roomCode);
@@ -77,9 +84,9 @@ function buildInvoidByManual(studentId, roomCode){
     //
     // 앞서서 Survey 진행한 정보에서 학생의 emailAddress, phoneNumber 를 복사한다.
     //
-    listsSheet.getRange("B2:B" + (lastRow -2)).getValues().forEach((value, index) => {
+    listsSheet.getRange("B2:B" + (lastRow -1)).getValues().forEach((value, index) => {
       if(value == studentId){
-        var oldValue = listsSheet.getRange(index +2, 1, 1, 4).getValues()[0];
+        var oldValue = listsSheet.getRange(index + 2, 1, 1, 4).getValues()[0];
         range.offset(0, 1, 1, 1).setValue(oldValue[2]);
         range.offset(0, 2, 1, 1).setValue(oldValue[3]);
       }
@@ -153,7 +160,14 @@ function setRoomNumberCode(studentInfo) {
     // @todo make sure synchronized block
     //
     nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
-    studentInfo.assignedRoom = nextRoomCode;
+    console.log("setRoomNumberCode", row, nextRoomCode);
+    // 
+    if(nextRoomCode === FULL_ROOMS) {
+      throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
+    }
+    else {
+      studentInfo.assignedRoom = nextRoomCode;
+    }
     updateNextRoomNumberCode(row, studentInfo);
   }
   setDormitoryInfo(row, studentInfo);
@@ -170,11 +184,11 @@ function setDormitoryInfo(residenceType, studentInfo) {
   // 침대는 최대 9개 미만 ( 알파벳 한자리 )
   var str_length = studentInfo.assignedRoom.length;
   var roomNumber = studentInfo.assignedRoom.substring(0,str_length - 1);
-  configSheet.getRange("B2:B" + (2+ availableRooms)).getValues().forEach((room, index) => {
+  configSheet.getRange("B2:B" + (1+ availableRooms)).getValues().forEach((room, index) => {
     // white space 제거, human error 를 방지
     if(room[0].toString().replace(/\s/g, "") == roomNumber.replace(/\s/g, "")){
       var roomInfo = configSheet.getRange("A" + (2 + index) + ":D" + (2 + index)).getValues()[0];
-      console.log('roomInfo', roomInfo);
+      // console.log('roomInfo', roomInfo);
       /** 
        * roomInfo array
        * 'Domitory Name',	
@@ -203,6 +217,8 @@ function setDormitoryInfo(residenceType, studentInfo) {
 
 /**
  * ConfigSheet 에 Next RoomNumberCode 를 update 한다.
+ * @param row number
+ * @param {Object} studentInfo
  */
 function updateNextRoomNumberCode(row, studentInfo) {
   //
@@ -211,17 +227,33 @@ function updateNextRoomNumberCode(row, studentInfo) {
   var bedCode =   roomCode.substring(roomCode.length -1);
 
   // next 침대
-  var nextRoomCode = findNextCode(roomNumber, bedCode);
-  // 미리 할당된 침대인지 dataSheet 확인
-  dataSheet.getRange("G2:G" + (2+ numberOfData)).getValues().forEach(value => {
-    if(value == nextRoomCode){
-      // 이미 할당된 침대이면 다음 침대
-      roomNumber = nextRoomCode.substring(0, nextRoomCode.length -1);
-      bedCode =   nextRoomCode.substring(nextRoomCode.length -1, nextRoomCode.length);    
-      nextRoomCode = findNextCode(roomNumber, bedCode);
-    }
-  });
+  var nextRoomCode;
+  if(isLastRoom(row, studentInfo.assignedRoom)){
+    nextRoomCode = FULL_ROOMS;
+  }
+  else {
+   nextRoomCode = findNextCode(roomNumber, bedCode);
+    // 미리 할당된 침대인지 dataSheet 확인
+    dataSheet.getRange("G2:G" + (1+ numberOfData)).getValues().forEach(value => {
+      if(value == nextRoomCode){
+        // 이미 할당된 침대이면 다음 침대
+        roomNumber = nextRoomCode.substring(0, nextRoomCode.length -1);
+        bedCode =   nextRoomCode.substring(nextRoomCode.length -1, nextRoomCode.length);    
+        nextRoomCode = findNextCode(roomNumber, bedCode);
+      }
+    });
+  }
   configSheet.getRange(row, nextRoomCodeColumn).setValue(nextRoomCode);
+}
+
+/**
+ * 더 배정 가능한 방이 있는지 여부 확인
+ * @param {Number} row 
+ * @param {Object} nextRoomCode 
+ */
+function isLastRoom(row, nextRoomCode) {
+  var lastRoomCode = configSheet.getRange(row, (nextRoomCodeColumn + 1) ).getValue();
+  return (lastRoomCode === nextRoomCode);
 }
 
 /**
@@ -229,8 +261,9 @@ function updateNextRoomNumberCode(row, studentInfo) {
  */
 function findNextCode(roomNumber, bedCode) { 
   var nextRoom, nextCode; 
-  configSheet.getRange("B2:B" + (2+ availableRooms)).getValues().forEach((room, index) => {
+  configSheet.getRange("B2:B" + (1+ availableRooms)).getValues().forEach((room, index) => {
     if(room == roomNumber){
+      // index 는 0 부터, 따라서 C2 부터 
       var bedArray = configSheet.getRange("C" + (2 + index) ).getValue().split(',');
 
       if(bedArray.indexOf(bedCode) == (bedArray.length -1)) {
@@ -245,7 +278,6 @@ function findNextCode(roomNumber, bedCode) {
       }
     }
   });
-
   return nextRoom + nextCode;
 }
 
@@ -255,10 +287,11 @@ function findNextCode(roomNumber, bedCode) {
  * @return {Object} residenceInfo
  */
 function getResidenceInfo(residenceType) {
-  // 'G' column 부터 7개 column
-  let residenceInfo = configSheet.getRange(residenceType, 7, 1, 7).getValues()[0];
+  // 'G' column 부터 8개 column
+  let residenceInfo = configSheet.getRange(residenceType, 7, 1, 8).getValues()[0];
   /**
    * 'Residence Type',
+   * 'Initial Room Code', // @todo introduce for resident range
    * 'Next Assigned Room Code',	
    * 'numberOfMonth',
    * 'Residence Period',	
@@ -266,15 +299,16 @@ function getResidenceInfo(residenceType) {
    * 'defaultFee',
    * 'alias'
    */
-  let residencePeriod = residenceInfo[3].split('~');
+  // Residence Period
+  let residencePeriod = residenceInfo[4].split('~');
   return {
     'type': residenceInfo[0],
-    'numberOfMonth': residenceInfo[2],
+    'numberOfMonth': residenceInfo[3],
     'availableDate': residencePeriod[0],
     'dueDate' : residencePeriod[1],
-    'paymentPeriod':residenceInfo[4],
-    'defaultFee': residenceInfo[5], // 무료 학생의 기본 기숙사 비
-    'aliasPattern': residenceInfo[6] // 기숙사 주소 alias Pattern
+    'paymentPeriod':residenceInfo[5], // 
+    'defaultFee': residenceInfo[6], // 무료 학생의 기본 기숙사 비
+    'aliasPattern': residenceInfo[7] // 기숙사 주소 alias Pattern
   };
 }
 
@@ -324,7 +358,7 @@ function createInvoiceForStudent(studentInfo, sheet, ssId) {
 
   // Clears existing data from the template.
   clearTemplateSheet(sheet);
-  // console.log(studentInfo);
+  console.log(studentInfo);
   // Sets values in the template.
   sheet.getRange('A5').setValue(studentInfo.dormName);
   sheet.getRange('B6').setValue(studentInfo.studentId);
