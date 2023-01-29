@@ -160,8 +160,6 @@ function setRoomNumberCode(studentInfo) {
     // @todo make sure synchronized block
     //
     nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
-    console.log("setRoomNumberCode", row, nextRoomCode);
-    // 
     if(nextRoomCode === FULL_ROOMS) {
       throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
     }
@@ -179,7 +177,6 @@ function setRoomNumberCode(studentInfo) {
 function setDormitoryInfo(residenceType, studentInfo) {
   // 기숙사 거주 유형별 정보
   const residenceInfo = getResidenceInfo(residenceType);
-  // console.log('residenceInfo', residenceInfo);
   //
   // 침대는 최대 9개 미만 ( 알파벳 한자리 )
   var str_length = studentInfo.assignedRoom.length;
@@ -291,8 +288,8 @@ function getResidenceInfo(residenceType) {
   let residenceInfo = configSheet.getRange(residenceType, 7, 1, 8).getValues()[0];
   /**
    * 'Residence Type',
-   * 'Initial Room Code', // @todo introduce for resident range
    * 'Next Assigned Room Code',	
+   * 'Last Room Code',
    * 'numberOfMonth',
    * 'Residence Period',	
    * 'Payment Peroid',
@@ -358,7 +355,6 @@ function createInvoiceForStudent(studentInfo, sheet, ssId) {
 
   // Clears existing data from the template.
   clearTemplateSheet(sheet);
-  console.log(studentInfo);
   // Sets values in the template.
   sheet.getRange('A5').setValue(studentInfo.dormName);
   sheet.getRange('B6').setValue(studentInfo.studentId);
