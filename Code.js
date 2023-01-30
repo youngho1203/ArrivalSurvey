@@ -52,7 +52,6 @@ function setInitialValue(e) {
  * @param {String} 수정하고자 하는 Code
  */
 function buildInvoidByManual(studentId, roomCode){
-  // console.log("Call buildInvoidByManual", studentId, roomCode);
   //
   var lastRow = listsSheet.getLastRow() + 1;
   var range = listsSheet.getRange(lastRow, 1);
@@ -65,10 +64,8 @@ function buildInvoidByManual(studentId, roomCode){
     if(studentInfo == undefined) {
       throw new Error("Can Not Find Your StudentId [" + studentId + "]");
     }    
-    // console.log(studentInfo);
     studentInfo.assignedRoom = roomCode;
     studentInfo.isPreAssigned = true;
-    // console.log(studentInfo);
     //
     doBuild(range, studentInfo, 'M');
     //
@@ -76,7 +73,6 @@ function buildInvoidByManual(studentId, roomCode){
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
     //
     dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
-      // why array ????
       if(value[0] == studentId){
         dataSheet.getRange(index + 2, 7).setValue(roomCode);
       }
@@ -127,8 +123,10 @@ function buildInvoicePdf(studentInfo) {
   }
 }
 
+/**
+ * @param {Object} studentInfo
+ */
 function setRoomNumberCode(studentInfo) {
-  // PreAssigned Check 를 해야 한다.
   var gender= studentInfo.gender;
   var isExchangeStudent = studentInfo.isExchangeStudent;
   // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
@@ -185,7 +183,6 @@ function setDormitoryInfo(residenceType, studentInfo) {
     // white space 제거, human error 를 방지
     if(room[0].toString().replace(/\s/g, "") == roomNumber.replace(/\s/g, "")){
       var roomInfo = configSheet.getRange("A" + (2 + index) + ":D" + (2 + index)).getValues()[0];
-      // console.log('roomInfo', roomInfo);
       /** 
        * roomInfo array
        * 'Domitory Name',	
