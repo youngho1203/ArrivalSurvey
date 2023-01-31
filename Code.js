@@ -93,6 +93,9 @@ function buildInvoidByManual(studentId, roomCode){
   }
 }
 
+/**
+ * main build
+ */
 function doBuild(range, studentInfo, genType) {
   //
   setRoomNumberCode(studentInfo);
