@@ -25,7 +25,7 @@ const OUTPUT_FOLDER_NAME = "Invoce of Arrival Student PDFs";
 */
 function clearTemplateSheet(sheet) {
   // Clears existing data from the template.
-  const rngClear = sheet.getRangeList(['A5', 'B6:B11', 'B13', 'B14']).getRanges()
+  const rngClear = sheet.getRangeList(['B5:B11', 'B13', 'B14']).getRanges()
   rngClear.forEach(function (cell) {
     cell.clearContent();
   });

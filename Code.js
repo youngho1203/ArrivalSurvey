@@ -28,6 +28,8 @@ const availableRooms = configSheet.getLastRow() -1;
 const nextRoomCodeColumn = 8;
 // 입실 가능한 방이 꽉 찼을 때 
 const FULL_ROOMS = "FULL";
+// configSheet 에서 DormFee
+// const updateDormFee = 6;
 
 /**
  * Arrival Survey 가 등록되면 실행된다.
@@ -52,6 +54,7 @@ function setInitialValue(e) {
  * @param {String} 수정하고자 하는 Code
  */
 function buildInvoidByManual(studentId, roomCode){
+  // console.log("Call buildInvoidByManual", studentId, roomCode);
   //
   var lastRow = listsSheet.getLastRow() + 1;
   var range = listsSheet.getRange(lastRow, 1);
@@ -64,8 +67,10 @@ function buildInvoidByManual(studentId, roomCode){
     if(studentInfo == undefined) {
       throw new Error("Can Not Find Your StudentId [" + studentId + "]");
     }    
+    // console.log(studentInfo);
     studentInfo.assignedRoom = roomCode;
     studentInfo.isPreAssigned = true;
+    // console.log(studentInfo);
     //
     doBuild(range, studentInfo, 'M');
     //
@@ -73,6 +78,7 @@ function buildInvoidByManual(studentId, roomCode){
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
     //
     dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
+      // why array ????
       if(value[0] == studentId){
         dataSheet.getRange(index + 2, 7).setValue(roomCode);
       }
@@ -82,7 +88,7 @@ function buildInvoidByManual(studentId, roomCode){
     //
     listsSheet.getRange("B2:B" + (lastRow -1)).getValues().forEach((value, index) => {
       if(value == studentId){
-        var oldValue = listsSheet.getRange(index + 2, 1, 1, 4).getValues()[0];
+        var oldValue = listsSheet.getRange(index +2, 1, 1, 4).getValues()[0];
         range.offset(0, 1, 1, 1).setValue(oldValue[2]);
         range.offset(0, 2, 1, 1).setValue(oldValue[3]);
       }
@@ -94,8 +100,8 @@ function buildInvoidByManual(studentId, roomCode){
 }
 
 function doBuild(range, studentInfo, genType) {
-  //
   setRoomNumberCode(studentInfo);
+  // console.log(studentInfo);
   // 
   range.offset(0, 3, 1, 1).setValue(studentInfo.assignedRoom);
   range.offset(0, 4, 1, 1).setValue(studentInfo.dormFee);
@@ -113,6 +119,7 @@ function doBuild(range, studentInfo, genType) {
  */
 function buildInvoicePdf(studentInfo) {
   try {
+    console.log(studentInfo);
     var url = createInvoiceForStudent(studentInfo, templateSheet, ws.getId());
     // toast is working on Manual Mode only.
     ws.toast("방 변경 Invoice 를 생성하였습니다.", '', 2);
@@ -123,32 +130,20 @@ function buildInvoicePdf(studentInfo) {
   }
 }
 
-/**
- * @param {Object} studentInfo
- */
 function setRoomNumberCode(studentInfo) {
+  // PreAssigned Check 를 해야 한다.
   var gender= studentInfo.gender;
   var isExchangeStudent = studentInfo.isExchangeStudent;
   // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
   // row 는 residence type 이다.
   var nextRoomCode, row; 
-  if(gender.startsWith('F')) {
+  if(gender.startsWith('여')) {
     // female
-    if(isExchangeStudent) {
-      row = 2;
-    }
-    else {
-      row = 4;
-    }
+    row = 2;
   }
   else {
     // male
-    if(isExchangeStudent) {
-      row = 3;
-    }
-    else {
-      row = 5;
-    }
+    row = 3;
   }
   if(studentInfo.isPreAssigned) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
@@ -169,25 +164,29 @@ function setRoomNumberCode(studentInfo) {
   setDormitoryInfo(row, studentInfo);
 }
 
+
 /**
  * assignedRoom 정보에서 dormitory 주소, 거주기한, fee 를 얻음.
  */
 function setDormitoryInfo(residenceType, studentInfo) {
   // 기숙사 거주 유형별 정보
   const residenceInfo = getResidenceInfo(residenceType);
+  // console.log("residenceInfo", residenceInfo);
   //
   // 침대는 최대 9개 미만 ( 알파벳 한자리 )
   var str_length = studentInfo.assignedRoom.length;
   var roomNumber = studentInfo.assignedRoom.substring(0,str_length - 1);
+  //
   configSheet.getRange("B2:B" + (1+ availableRooms)).getValues().forEach((room, index) => {
     // white space 제거, human error 를 방지
     if(room[0].toString().replace(/\s/g, "") == roomNumber.replace(/\s/g, "")){
       var roomInfo = configSheet.getRange("A" + (2 + index) + ":D" + (2 + index)).getValues()[0];
+      // console.log("find RoomInfo ", roomInfo);
       /** 
        * roomInfo array
        * 'Domitory Name',	
        * 'Available Rooms',	
-       * 'Beds'
+       * 'Beds',
        * 'DomFee per Month'
       */
       if(studentInfo.isFree) {
@@ -195,8 +194,8 @@ function setDormitoryInfo(residenceType, studentInfo) {
       }
       else {
         //
-        // 기본 요금 + 각 dormitory 의 단위 요금 * 거주 기간 = 기숙사 비
-        //        
+        // 각 dormitory 의 단위 요금 * 거주 기간 + 관리비 = 기숙사 비
+        //
         studentInfo.dormFee = residenceInfo.defaultFee + residenceInfo.numberOfMonth * roomInfo[3];
       }
       // 
@@ -206,19 +205,17 @@ function setDormitoryInfo(residenceType, studentInfo) {
       studentInfo.paymentPeriod = residenceInfo.paymentPeriod;
       studentInfo.aliasPattern = residenceInfo.aliasPattern;
     }
-  });
+  })
 }
 
 /**
  * ConfigSheet 에 Next RoomNumberCode 를 update 한다.
- * @param row number
- * @param {Object} studentInfo
  */
 function updateNextRoomNumberCode(row, studentInfo) {
   //
   var roomCode = studentInfo.assignedRoom;
   var roomNumber = roomCode.substring(0, roomCode.length -1);
-  var bedCode =   roomCode.substring(roomCode.length -1);
+  var bedCode = roomCode.substring(roomCode.length -1);
 
   // next 침대
   var nextRoomCode;
@@ -255,9 +252,8 @@ function isLastRoom(row, nextRoomCode) {
  */
 function findNextCode(roomNumber, bedCode) { 
   var nextRoom, nextCode; 
-  configSheet.getRange("B2:B" + (1+ availableRooms)).getValues().forEach((room, index) => {
+  configSheet.getRange("B2:B" + (1 + availableRooms)).getValues().forEach((room, index) => {
     if(room == roomNumber){
-      // index 는 0 부터, 따라서 C2 부터 
       var bedArray = configSheet.getRange("C" + (2 + index) ).getValue().split(',');
 
       if(bedArray.indexOf(bedCode) == (bedArray.length -1)) {
@@ -272,6 +268,7 @@ function findNextCode(roomNumber, bedCode) {
       }
     }
   });
+
   return nextRoom + nextCode;
 }
 
@@ -281,7 +278,25 @@ function findNextCode(roomNumber, bedCode) {
  * @return {Object} residenceInfo
  */
 function getResidenceInfo(residenceType) {
-  // 'G' column 부터 8개 column
+  /**
+   * 이부분 코드는 제거하는 것이 좋습니다.
+   * 기숙사비는 Config tab 의 ResidenceType table 에 설정되어 있어야 한니다.
+   * 그리고 방 코드 update 하고, 기숙사비 update 는 아무 연관성이 없습니다.
+   * 
+   * 그리고 Config tab 의 정보는 Code 상에서 변경은 매우 위험합니다.
+   * 'Next Assigned Room Code' Column 값을 별도 tab 에서 처리할 까 했는데, 너무 tab 이 많은 듯 해서....
+   * Config tab 의 정보중 code 로 변경하는 것은 'Next Assigned Room Code' 값이 유일하여야 합니다.
+   * 
+  var roomName = configSheet.getRange('E2').getValue();
+  // 방 코드를 업데이트하며 기숙사비도 같이 업데이트 (사임당 / 일반 구분)
+  if(roomName.startsWith('S')) {
+    configSheet.getRange('F2').setValue('₩1,698,000');
+  }
+  else{
+    configSheet.getRange('F2').setValue('₩1,218,000');
+  }
+  */
+  // 'G' column 부터 8개 column 갑을 가지고 옴
   let residenceInfo = configSheet.getRange(residenceType, 7, 1, 8).getValues()[0];
   /**
    * 'Residence Type',
@@ -293,14 +308,13 @@ function getResidenceInfo(residenceType) {
    * 'defaultFee',
    * 'alias'
    */
-  // Residence Period
   let residencePeriod = residenceInfo[4].split('~');
   return {
     'type': residenceInfo[0],
     'numberOfMonth': residenceInfo[3],
     'availableDate': residencePeriod[0],
     'dueDate' : residencePeriod[1],
-    'paymentPeriod':residenceInfo[5], // 
+    'paymentPeriod':residenceInfo[5],
     'defaultFee': residenceInfo[6], // 무료 학생의 기본 기숙사 비
     'aliasPattern': residenceInfo[7] // 기숙사 주소 alias Pattern
   };
@@ -316,7 +330,6 @@ function getStudentInfo(studentId) {
       studentData = dataSheet.getRange(index + 2, 1, 1, 7).getValues()[0];
     }
   });
-
   if(studentData){
     var isAssigned = studentData[6] == '' ? false : true;
     return { 
@@ -352,6 +365,7 @@ function createInvoiceForStudent(studentInfo, sheet, ssId) {
 
   // Clears existing data from the template.
   clearTemplateSheet(sheet);
+  // console.log(studentInfo);
   // Sets values in the template.
   sheet.getRange('A5').setValue(studentInfo.dormName);
   sheet.getRange('B6').setValue(studentInfo.studentId);
