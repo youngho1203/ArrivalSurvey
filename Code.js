@@ -30,6 +30,10 @@ const nextRoomCodeColumn = 8;
 const FULL_ROOMS = "FULL";
 
 /**
+ * @TODO : Duplicate survey protection.
+ * @TODO : Response List : Name column add 
+ */
+/**
  * Arrival Survey 가 등록되면 실행된다.
  * @param {Object} survey event object
  */
@@ -37,13 +41,29 @@ function setInitialValue(e) {
   try {
     var range = e.range.offset(0,1, 1, 1);
     var studentId = range.getValue();
+    if(deDupeCheck(studentId)) {
+      throw new Error("[" + studentId + "] is Aleady CheckIn");
+    }
     var studentInfo = getStudentInfo(studentId);
+    if(studentInfo == undefined) {
+      throw new Error("Can Not Find Your StudentId [" + studentId + "]");
+    } 
     //
     doBuild(range, studentInfo, 'A');
   }
   catch(e) {
     range.offset(0, 6, 1, 1).setValue(e);
   }
+}
+
+/**
+ * dedupe check for duplication checkin
+ */
+function deDupeCheck(studentId) {
+  // lastRow 는 지금 진행하고 있는 것. 바로 직전까지만 처리
+  var lastRow = listsSheet.getLastRow() -1;
+  var range = listsSheet.getRange("B2:B" + lastRow);
+  return range.getValues().find( id => { return id[0] === studentId });
 }
 
 /**
@@ -67,7 +87,7 @@ function buildInvoidByManual(studentId, roomCode){
     studentInfo.assignedRoom = roomCode;
     studentInfo.isPreAssigned = true;
     //
-    doBuild(range, studentInfo, 'M');
+    var modified_pdf_url = doBuild(range, studentInfo, 'M');
     //
     // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
@@ -78,15 +98,23 @@ function buildInvoidByManual(studentId, roomCode){
       }
     });
     //
-    // 앞서서 Survey 진행한 정보에서 학생의 emailAddress, phoneNumber 를 복사한다.
+    // 앞서서 Survey 진행한 정보에서 학생의 new roomCode, modified_pdf_url 을 설정한다.
     //
     listsSheet.getRange("B2:B" + (lastRow -1)).getValues().forEach((value, index) => {
       if(value == studentId){
-        var oldValue = listsSheet.getRange(index + 2, 1, 1, 4).getValues()[0];
-        range.offset(0, 1, 1, 1).setValue(oldValue[2]);
-        range.offset(0, 2, 1, 1).setValue(oldValue[3]);
+        // timestamp
+        listsSheet.getRange(index + 2, 1, 1, 1).setValue(new Date());
+        // roomCode
+        listsSheet.getRange(index + 2, 5, 1, 1).setValue(roomCode);
+        // doomfee
+        listsSheet.getRange(index + 2, 6, 1, 1).setValue(studentInfo.dormFee);
+        // modifiedPdfUrl
+        listsSheet.getRange(index + 2, 8, 1, 1).setValue(modified_pdf_url);
+        listsSheet.getRange(index + 2, 1, 1, 8).setBackground("#e0e0e0");
       }
     });
+    // M 을 지운다.
+    listsSheet.deleteRow(lastRow);
   }
   catch(e) {
     range.offset(0, 6, 1, 1).setValue(e);
@@ -95,6 +123,7 @@ function buildInvoidByManual(studentId, roomCode){
 
 /**
  * main build
+ * @return invoice_url
  */
 function doBuild(range, studentInfo, genType) {
   //
@@ -107,6 +136,7 @@ function doBuild(range, studentInfo, genType) {
   // build invoice now
   var invoice_url = buildInvoicePdf(studentInfo);
   range.offset(0, 6, 1, 1).setValue(invoice_url);
+  return invoice_url;
 }
 
 /**
@@ -319,7 +349,7 @@ function getStudentInfo(studentId) {
       studentData = dataSheet.getRange(index + 2, 1, 1, 7).getValues()[0];
     }
   });
-
+  console.log(studentData);
   if(studentData){
     var isAssigned = studentData[6] == '' ? false : true;
     return { 
