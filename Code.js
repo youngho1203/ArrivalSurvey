@@ -30,7 +30,6 @@ const nextRoomCodeColumn = 8;
 const FULL_ROOMS = "FULL";
 
 /**
- * @TODO : Duplicate survey protection.
  * @TODO : Response List : Name column add 
  */
 /**
@@ -349,7 +348,6 @@ function getStudentInfo(studentId) {
       studentData = dataSheet.getRange(index + 2, 1, 1, 7).getValues()[0];
     }
   });
-  console.log(studentData);
   if(studentData){
     var isAssigned = studentData[6] == '' ? false : true;
     return { 
