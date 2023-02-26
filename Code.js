@@ -40,7 +40,7 @@ function setInitialValue(e) {
   try {
     var range = e.range.offset(0,1, 1, 1);
     var studentId = range.getValue();
-    if(deDupeCheck(studentId)) {
+    if(deDupeCheck(studentId) !== undefined){
       throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
     var studentInfo = getStudentInfo(studentId);
