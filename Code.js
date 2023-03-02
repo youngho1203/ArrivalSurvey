@@ -31,6 +31,9 @@ const FULL_ROOMS = "FULL";
 
 /**
  * @TODO : Response List : Name column add 
+ * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
+ * @TODO : lastLow 위치 확인.
+ * @TODO : 현황 LIST 생성
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
@@ -41,6 +44,7 @@ function setInitialValue(e) {
     var range = e.range.offset(0,1, 1, 1);
     var studentId = range.getValue();
     if(deDupeCheck(studentId) !== undefined){
+      // console.log(deDupeCheck(studentId));
       throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
     var studentInfo = getStudentInfo(studentId);
