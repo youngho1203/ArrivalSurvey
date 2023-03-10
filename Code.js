@@ -20,6 +20,10 @@ const configSheet = ws.getSheetByName("Config");
 const dataSheet = ws.getSheetByName("Data");
 // Invoice Template
 const templateSheet = ws.getSheetByName("Template");
+// 현황 List ID
+const RESIDENCE_LIST_ID = '1rDZ2t9fJUX8iJZsjF2gGHSWSvl1_X42Ji89-gK4H9PU'; // 적절하게 변경하여야 함.
+// 현황 SpreadSheet ( 사전에 만들어져 있어야 한다. )
+const residenceListSheet = SpreadsheetApp.openById(RESIDENCE_LIST_ID);
 // 허용 입사 학생 총 수
 const numberOfData = dataSheet.getLastRow() - 1;
 // 입사 가능 방 총 수
@@ -33,7 +37,8 @@ const FULL_ROOMS = "FULL";
  * @TODO : Response List : Name column add 
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
  * @TODO : lastLow 위치 확인.
- * @TODO : 현황 LIST 생성
+ * @TODO : 현황 LIST 에 Data 입력.
+ * @TODO : 배정 진행시 이 빠진 Bed 를 확인하여 Next 보다 우선 설정.
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
@@ -53,6 +58,14 @@ function setInitialValue(e) {
     } 
     //
     doBuild(range, studentInfo, 'A');
+    //
+    // 현황 List 에 내용을 추가한다.
+    //
+    var values = e.range.getValues()[0];
+    studentInfo.email = values[2];
+    studentInfo.phone = values[3];
+    //
+    appendResidence(studentInfo);
   }
   catch(e) {
     range.offset(0, 6, 1, 1).setValue(e);
@@ -118,6 +131,10 @@ function buildInvoidByManual(studentId, roomCode){
     });
     // M 을 지운다.
     listsSheet.deleteRow(lastRow);
+    //
+    // Residence data 를 update 한다.
+    //
+    updateResidence(studentInfo);
   }
   catch(e) {
     range.offset(0, 6, 1, 1).setValue(e);
@@ -370,10 +387,50 @@ function getStudentInfo(studentId) {
       'dueDate': '', // 거주 종료 날짜
       'address' :'', // 기숙사 방 주소
       'paymentPeriod':'', // 기숙사비 납부 일정
-      'aliasPattern': '' // 기숙사 이름 alias pattern
+      'aliasPattern': '', // 기숙사 이름 alias pattern
+      'phone':'',
+      'email':''
       };
   }
   return undefined;
+}
+
+/**
+ * ResidenceList 에 student 를 축가한다.
+ * @param {Object} studentInfo
+ */
+function appendResidence(studentInfo) {
+  rowData = [
+    '', // A : 순번
+    studentInfo.assignedRoom.substring(0, studentInfo.assignedRoom.length -1), // B : 호실
+    studentInfo.assignedRoom.substring(studentInfo.assignedRoom.length -1), //C : 구분
+    false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
+    studentInfo.studentId, // E : 학번
+    studentInfo.name, // F : 이름
+    studentInfo.nationality, // G : 국적
+    studentInfo.gender, // H : 성별
+    '', // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
+    '', // J : 입사 보고일
+    '', // K : 납부
+    '', // L : 메디컬
+    '', // M : Gen Mode 
+    '', // N : 시설 점검표
+    '', // O : 연장여부
+    studentInfo.phone, // P : 핸드폰
+    studentInfo.email, // Q : 이메일
+    '', // R : 비고
+    '', // S : 비고 1
+    '' //T : 거주 증명서 : 발행된 거주증명서 pdf file URL
+  ];
+  residenceListSheet.appendRow(rowData);
+}
+
+/**
+ * ResidenceList 에 student 를 변경한다.
+ * @param {Object} studentInfo
+ */
+function updateResidence(studentInfo) {
+
 }
 
 /**
