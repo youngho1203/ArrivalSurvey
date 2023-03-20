@@ -39,6 +39,7 @@ const FULL_ROOMS = "FULL";
  * @TODO : lastLow 위치 확인.
  * @TODO : 현황 LIST 에 Data 입력.
  * @TODO : 배정 진행시 이 빠진 Bed 를 확인하여 Next 보다 우선 설정.
+ * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
