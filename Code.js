@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 const ws = SpreadsheetApp.getActiveSpreadsheet();
-// 도착 학생 목록
+// 도착 학생 목록 ( Response List )
 const listsSheet = ws.getSheetByName("Response List");
 // 방 설정 정보
 const configSheet = ws.getSheetByName("Config");
@@ -20,10 +20,15 @@ const configSheet = ws.getSheetByName("Config");
 const dataSheet = ws.getSheetByName("Data");
 // Invoice Template
 const templateSheet = ws.getSheetByName("Template");
-// 현황 List ID
-const RESIDENCE_LIST_ID = '1rDZ2t9fJUX8iJZsjF2gGHSWSvl1_X42Ji89-gK4H9PU'; // 적절하게 변경하여야 함.
+// 현황 List Unique ID : Arrival Survey 를 입사생이 진행하면, 그 결과를 기숙사 현황 List 에도 같이 등록하기 위한 현황 List ID
+// 광개토관 기숙사 : 0. 광개토관 기숙사 현황 ID
+// 외부 기숙사 : 
+const RESIDENCE_LIST_ID = '19eaIfuIvedUCf0l2V_ZbcP6hfFqmFNWI2sfW1OVWUig';
 // 현황 SpreadSheet ( 사전에 만들어져 있어야 한다. )
 const residenceListSheet = SpreadsheetApp.openById(RESIDENCE_LIST_ID);
+// 현황 SpreadSheet 현재 진행 Tab Name ( 사전에 설정되어 있어야 한다. )
+const currentSituationListName = configSheet.getRange("T2").getValue();
+
 // 허용 입사 학생 총 수
 const numberOfData = dataSheet.getLastRow() - 1;
 // 입사 가능 방 총 수
@@ -34,12 +39,11 @@ const nextRoomCodeColumn = 8;
 const FULL_ROOMS = "FULL";
 
 /**
- * @TODO : Response List : Name column add 
+ * @TODO : 현황 LIST 에 자동으로 행 입력.
+ * @TODO : 생일 Data 추가
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
- * @TODO : lastLow 위치 확인.
- * @TODO : 현황 LIST 에 Data 입력.
  * @TODO : 배정 진행시 이 빠진 Bed 를 확인하여 Next 보다 우선 설정.
- * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리
+ * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리 ( NOT FOUND 발생시 InsertArrivalSurvey 로 다시 실시 ?????, 실제 학번을 가지고 있는 학생인지 어떻게 확인???? )
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
@@ -65,22 +69,45 @@ function setInitialValue(e) {
     var values = e.range.getValues()[0];
     studentInfo.email = values[2];
     studentInfo.phone = values[3];
+    console.log("Now add to 현황 List : ", studentInfo);
     //
+    // 현황 List 는 미리 준비되어 있어야 한다.
     appendResidence(studentInfo);
   }
   catch(e) {
+    range.clearContent();
     range.offset(0, 6, 1, 1).setValue(e);
+    range.offset(0,-1,1,8).setBackground("Orange");
   }
 }
 
 /**
  * dedupe check for duplication checkin
+ * Survey Response List 에서만 확인한다.
  */
 function deDupeCheck(studentId) {
   // lastRow 는 지금 진행하고 있는 것. 바로 직전까지만 처리
   var lastRow = listsSheet.getLastRow() -1;
   var range = listsSheet.getRange("B2:B" + lastRow);
   return range.getValues().find( id => { return id[0] === studentId });
+}
+
+/**
+ * nextBed 가 앞으로 진행되고 있는데 어떤 이유에서든( 수동 배정 이동 ) 그 앞에 빠진 침대가 있으면 먼저 그 침대에 배정한다.
+ * 현황 List 에서 확인한다.
+ */
+function findSkipBed() {
+  currentSituationList = residenceListSheet.getSheetByName(currentSituationListName);
+  var lastRow = currentSituationList.getLastRow();
+  var range = listsSheet.getRange("E3:E" + lastRow);
+  // 학번이 공란이 것을 확인한다.
+  range.getValues().forEach((value,index) => { 
+    if(isCellEmpty(value)) {
+      // 해당 bed 정보를 return
+      return listsSheet.getRange(index + 2, 2, 1, 2).getValues().join();
+    }
+  });
+  return '';
 }
 
 /**
@@ -141,7 +168,49 @@ function buildInvoidByManual(studentId, roomCode){
     range.offset(0, 6, 1, 1).setValue(e);
   }
 }
-
+/*
+function buildInvoidByManual(studentId, roomCode){
+  //
+  var lastRow = listsSheet.getLastRow() + 1;
+  var range = listsSheet.getRange(lastRow, 1);
+  range.setValue(new Date());  
+  range = range.offset(0, 1, 1, 1);
+  range.setValue(studentId);
+  
+  try {
+    var studentInfo = getStudentInfo(studentId);
+    if(studentInfo == undefined) {
+      throw new Error("Can Not Find Your StudentId [" + studentId + "]");
+    }    
+    studentInfo.assignedRoom = roomCode;
+    studentInfo.isPreAssigned = true;
+    //
+    doBuild(range, studentInfo, 'M');
+    //
+    // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
+    // ( findNextCode 로직을 동일하게 유지시킨다. ) 
+    //
+    dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
+      if(value[0] == studentId){
+        dataSheet.getRange(index + 2, 7).setValue(roomCode);
+      }
+    });
+    //
+    // 앞서서 Survey 진행한 정보에서 학생의 emailAddress, phoneNumber 를 복사한다.
+    //
+    listsSheet.getRange("B2:B" + (lastRow -1)).getValues().forEach((value, index) => {
+      if(value == studentId){
+        var oldValue = listsSheet.getRange(index + 2, 1, 1, 4).getValues()[0];
+        range.offset(0, 1, 1, 1).setValue(oldValue[2]);
+        range.offset(0, 2, 1, 1).setValue(oldValue[3]);
+      }
+    });
+  }
+  catch(e) {
+    range.offset(0, 6, 1, 1).setValue(e);
+  }
+}
+*/
 /**
  * main build
  * @return invoice_url
@@ -204,6 +273,14 @@ function setRoomNumberCode(studentInfo) {
       row = 5;
     }
   }
+  
+  // skipBed 가 존재하면, skipBed 로 설정한다.
+  var skipBed = findSkipBed();
+  if(!isCellEmpty(skipBed) && !studentInfo.isPreAssigned) {
+    studentInfo.assignedRoom = skipBed;
+    studentInfo.isPreAssigned = true;
+  }
+  //
   if(studentInfo.isPreAssigned) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
   }
@@ -397,14 +474,11 @@ function getStudentInfo(studentId) {
 }
 
 /**
- * ResidenceList 에 student 를 축가한다.
+ * ResidenceList 에 방 배정된 학생 정보를 등록한다.
  * @param {Object} studentInfo
  */
 function appendResidence(studentInfo) {
-  rowData = [
-    '', // A : 순번
-    studentInfo.assignedRoom.substring(0, studentInfo.assignedRoom.length -1), // B : 호실
-    studentInfo.assignedRoom.substring(studentInfo.assignedRoom.length -1), //C : 구분
+  rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
     studentInfo.studentId, // E : 학번
     studentInfo.name, // F : 이름
@@ -418,12 +492,15 @@ function appendResidence(studentInfo) {
     '', // N : 시설 점검표
     '', // O : 연장여부
     studentInfo.phone, // P : 핸드폰
-    studentInfo.email, // Q : 이메일
-    '', // R : 비고
-    '', // S : 비고 1
-    '' //T : 거주 증명서 : 발행된 거주증명서 pdf file URL
-  ];
-  residenceListSheet.appendRow(rowData);
+    studentInfo.email // Q : 이메일
+  ]];
+  // console.log(rowData);
+  var lastLow = residenceListSheet.getLastRow();
+  residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
+    if(array.join().replace(",","") == studentInfo.assignedRoom) {
+      residenceListSheet.getRange("D" + (index + 2) + ":Q" + (index + 2)).setValues(rowData);
+    }
+  })
 }
 
 /**
@@ -431,7 +508,7 @@ function appendResidence(studentInfo) {
  * @param {Object} studentInfo
  */
 function updateResidence(studentInfo) {
-
+  // @todo need implements
 }
 
 /**
@@ -470,4 +547,9 @@ function createInvoiceForStudent(studentInfo, sheet, ssId) {
   const pdf = createPDF(ssId, sheet, pdfFileName);
 
   return pdf.getUrl();
+}
+
+// Returns true if the cell where cellData was read from is empty.
+function isCellEmpty(cellData) {
+  return typeof (cellData) == "string" && cellData == "";
 }
