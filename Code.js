@@ -69,7 +69,7 @@ function setInitialValue(e) {
     var values = e.range.getValues()[0];
     studentInfo.email = values[2];
     studentInfo.phone = values[3];
-    console.log("Now add to 현황 List : ", studentInfo);
+    // console.log("Now add to 현황 List : ", studentInfo);
     //
     // 현황 List 는 미리 준비되어 있어야 한다.
     appendResidence(studentInfo);
@@ -95,21 +95,36 @@ function deDupeCheck(studentId) {
 /**
  * nextBed 가 앞으로 진행되고 있는데 어떤 이유에서든( 수동 배정 이동 ) 그 앞에 빠진 침대가 있으면 먼저 그 침대에 배정한다.
  * 현황 List 에서 확인한다.
- * @todo 로직에 bug 가 있다. ResidenceType 별 Interval[] 도입 필요.
  * @param residenceType
  */
 function findSkipBed(residenceType) {
+  // [nextCode, firstCode] array
+  var code_range = configSheet.getRange(residenceType, nextRoomCodeColumn, 1, 2).getValues()[0];
   currentList = residenceListSheet.getSheetByName(currentListName);
-  var lastRow = currentList.getLastRow();
-  var range = listsSheet.getRange("E3:E" + lastRow);
-  // 학번이 공란이 것을 확인한다.
-  range.getValues().forEach((value,index) => { 
-    if(isCellEmpty(value)) {
-      // 해당 bed 정보를 return
-      return listsSheet.getRange(index + 2, 2, 1, 2).getValues().join('');
+  // residenceType 별 row range 를 구한다.
+  var startRow;
+  var lastRow;
+  var totalLastRow = currentList.getLastRow();
+  currentList.getRange("B3:C" + totalLastRow).getValues().forEach((value, index) => {
+    if(value.join('') == code_range[1]) {
+      startRow = index + 3;
+    }
+    else if(value.join('') == code_range[0]) {
+      // nextCode 바로 전 까지만 확인 
+      lastRow = index + 2;
     }
   });
-  return '';
+
+  // 학번이 공란이 것을 확인한다.
+  var skipBedCode = '';
+  currentList.getRange("A" + startRow + ":E" + lastRow).getValues().forEach((value,index) => { 
+    if(value[4] == '' && skipBedCode == '') {
+      // 해당 bed 정보를 return
+      // 순번은 1부터 순차적으로 증가하여야 한다.
+      skipBedCode = currentList.getRange(value[0] + 2, 2, 1, 2).getValues()[0].join('');
+    }
+  });
+  return skipBedCode;
 }
 
 /**
@@ -170,49 +185,7 @@ function buildInvoidByManual(studentId, roomCode){
     range.offset(0, 6, 1, 1).setValue(e);
   }
 }
-/*
-function buildInvoidByManual(studentId, roomCode){
-  //
-  var lastRow = listsSheet.getLastRow() + 1;
-  var range = listsSheet.getRange(lastRow, 1);
-  range.setValue(new Date());  
-  range = range.offset(0, 1, 1, 1);
-  range.setValue(studentId);
-  
-  try {
-    var studentInfo = getStudentInfo(studentId);
-    if(studentInfo == undefined) {
-      throw new Error("Can Not Find Your StudentId [" + studentId + "]");
-    }    
-    studentInfo.assignedRoom = roomCode;
-    studentInfo.isPreAssigned = true;
-    //
-    doBuild(range, studentInfo, 'M');
-    //
-    // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
-    // ( findNextCode 로직을 동일하게 유지시킨다. ) 
-    //
-    dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
-      if(value[0] == studentId){
-        dataSheet.getRange(index + 2, 7).setValue(roomCode);
-      }
-    });
-    //
-    // 앞서서 Survey 진행한 정보에서 학생의 emailAddress, phoneNumber 를 복사한다.
-    //
-    listsSheet.getRange("B2:B" + (lastRow -1)).getValues().forEach((value, index) => {
-      if(value == studentId){
-        var oldValue = listsSheet.getRange(index + 2, 1, 1, 4).getValues()[0];
-        range.offset(0, 1, 1, 1).setValue(oldValue[2]);
-        range.offset(0, 2, 1, 1).setValue(oldValue[3]);
-      }
-    });
-  }
-  catch(e) {
-    range.offset(0, 6, 1, 1).setValue(e);
-  }
-}
-*/
+
 /**
  * main build
  * @return invoice_url
@@ -275,29 +248,30 @@ function setRoomNumberCode(studentInfo) {
       row = 5;
     }
   }
-  
-  // skipBed 가 존재하면, skipBed 로 설정한다.
-  var skipBed = findSkipBed(row);
-  if(!isCellEmpty(skipBed) && !studentInfo.isPreAssigned) {
-    studentInfo.assignedRoom = skipBed;
-    studentInfo.isPreAssigned = true;
-  }
   //
   if(studentInfo.isPreAssigned) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
   }
   else {
-    //
-    // @todo make sure synchronized block
-    //
-    nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
     if(nextRoomCode === FULL_ROOMS) {
       throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
     }
     else {
-      studentInfo.assignedRoom = nextRoomCode;
+      // skipBed 가 존재하면, skipBed 로 설정한다.
+      var skipBed = findSkipBed(row);
+      if(!isCellEmpty(skipBed)) {
+        studentInfo.assignedRoom = skipBed;
+        studentInfo.isPreAssigned = true;
+      }
+      else {      
+        //
+        // @todo make sure synchronized block
+        //
+        nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();      
+        studentInfo.assignedRoom = nextRoomCode;
+        updateNextRoomNumberCode(row, studentInfo);
+      }
     }
-    updateNextRoomNumberCode(row, studentInfo);
   }
   setDormitoryInfo(row, studentInfo);
 }
