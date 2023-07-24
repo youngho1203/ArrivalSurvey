@@ -27,7 +27,7 @@ const RESIDENCE_LIST_ID = '19eaIfuIvedUCf0l2V_ZbcP6hfFqmFNWI2sfW1OVWUig';
 // 현황 SpreadSheet ( 사전에 만들어져 있어야 한다. )
 const residenceListSheet = SpreadsheetApp.openById(RESIDENCE_LIST_ID);
 // 현황 SpreadSheet 현재 진행 Tab Name ( 사전에 설정되어 있어야 한다. )
-const currentSituationListName = configSheet.getRange("T2").getValue();
+const currentListName = configSheet.getRange("T2").getValue();
 
 // 허용 입사 학생 총 수
 const numberOfData = dataSheet.getLastRow() - 1;
@@ -95,16 +95,18 @@ function deDupeCheck(studentId) {
 /**
  * nextBed 가 앞으로 진행되고 있는데 어떤 이유에서든( 수동 배정 이동 ) 그 앞에 빠진 침대가 있으면 먼저 그 침대에 배정한다.
  * 현황 List 에서 확인한다.
+ * @todo 로직에 bug 가 있다. ResidenceType 별 Interval[] 도입 필요.
+ * @param residenceType
  */
-function findSkipBed() {
-  currentSituationList = residenceListSheet.getSheetByName(currentSituationListName);
-  var lastRow = currentSituationList.getLastRow();
+function findSkipBed(residenceType) {
+  currentList = residenceListSheet.getSheetByName(currentListName);
+  var lastRow = currentList.getLastRow();
   var range = listsSheet.getRange("E3:E" + lastRow);
   // 학번이 공란이 것을 확인한다.
   range.getValues().forEach((value,index) => { 
     if(isCellEmpty(value)) {
       // 해당 bed 정보를 return
-      return listsSheet.getRange(index + 2, 2, 1, 2).getValues().join();
+      return listsSheet.getRange(index + 2, 2, 1, 2).getValues().join('');
     }
   });
   return '';
@@ -275,7 +277,7 @@ function setRoomNumberCode(studentInfo) {
   }
   
   // skipBed 가 존재하면, skipBed 로 설정한다.
-  var skipBed = findSkipBed();
+  var skipBed = findSkipBed(row);
   if(!isCellEmpty(skipBed) && !studentInfo.isPreAssigned) {
     studentInfo.assignedRoom = skipBed;
     studentInfo.isPreAssigned = true;
@@ -377,7 +379,7 @@ function updateNextRoomNumberCode(row, studentInfo) {
  * @param {Object} nextRoomCode 
  */
 function isLastRoom(row, nextRoomCode) {
-  var lastRoomCode = configSheet.getRange(row, (nextRoomCodeColumn + 1) ).getValue();
+  var lastRoomCode = configSheet.getRange(row, (nextRoomCodeColumn + 2) ).getValue();
   return (lastRoomCode === nextRoomCode);
 }
 
@@ -413,10 +415,11 @@ function findNextCode(roomNumber, bedCode) {
  */
 function getResidenceInfo(residenceType) {
   // 'G' column 부터 8개 column
-  let residenceInfo = configSheet.getRange(residenceType, 7, 1, 8).getValues()[0];
+  let residenceInfo = configSheet.getRange(residenceType, 7, 1, 9).getValues()[0];
   /**
    * 'Residence Type',
    * 'Next Assigned Room Code',	
+   * 'First Room Code',
    * 'Last Room Code',
    * 'numberOfMonth',
    * 'Residence Period',	
@@ -425,15 +428,15 @@ function getResidenceInfo(residenceType) {
    * 'alias'
    */
   // Residence Period
-  let residencePeriod = residenceInfo[4].split('~');
+  let residencePeriod = residenceInfo[5].split('~');
   return {
     'type': residenceInfo[0],
-    'numberOfMonth': residenceInfo[3],
+    'numberOfMonth': residenceInfo[4],
     'availableDate': residencePeriod[0],
     'dueDate' : residencePeriod[1],
-    'paymentPeriod':residenceInfo[5], // 
-    'defaultFee': residenceInfo[6], // 무료 학생의 기본 기숙사 비
-    'aliasPattern': residenceInfo[7] // 기숙사 주소 alias Pattern
+    'paymentPeriod':residenceInfo[6], // 
+    'defaultFee': residenceInfo[7], // 무료 학생의 기본 기숙사 비
+    'aliasPattern': residenceInfo[8] // 기숙사 주소 alias Pattern
   };
 }
 
@@ -494,11 +497,11 @@ function appendResidence(studentInfo) {
     studentInfo.phone, // P : 핸드폰
     studentInfo.email // Q : 이메일
   ]];
-  // console.log(rowData);
+  // console.log(studentInfo);
   var lastLow = residenceListSheet.getLastRow();
   residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
-    if(array.join().replace(",","") == studentInfo.assignedRoom) {
-      residenceListSheet.getRange("D" + (index + 2) + ":Q" + (index + 2)).setValues(rowData);
+    if(array.join('') == studentInfo.assignedRoom) {
+      residenceListSheet.getRange("D" + (index + 3) + ":Q" + (index + 3)).setValues(rowData);
     }
   })
 }
