@@ -421,7 +421,7 @@ function getStudentInfo(studentId) {
   var studentData;
   dataSheet.getRange(2,1,numberOfData).getValues().forEach((id, index) => {
     if(id == studentId) {
-      studentData = dataSheet.getRange(index + 2, 1, 1, 7).getValues()[0];
+      studentData = dataSheet.getRange(index + 2, 1, 1, 8).getValues()[0];
     }
   });
   if(studentData){
@@ -431,9 +431,10 @@ function getStudentInfo(studentId) {
       'name':studentData[1], 
       'nationality':studentData[2], 
       'gender': studentData[3], 
-      'isFree':studentData[4], 
-      'isExchangeStudent':studentData[5], 
-      'assignedRoom':studentData[6], // 배정된 방
+      'birthday': studentData[4],
+      'isFree':studentData[5], 
+      'isExchangeStudent':studentData[6], 
+      'assignedRoom':studentData[7], // 선 배정된 방
       'isPreAssigned': isAssigned,
       'dormName': '', // Dorm Name
       'dormFee':-1, // 기숙사 비
@@ -461,7 +462,7 @@ function appendResidence(studentInfo) {
     studentInfo.name, // F : 이름
     studentInfo.nationality, // G : 국적
     studentInfo.gender, // H : 성별
-    '', // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
+    studentInfo.birthday, // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
     '', // J : 입사 보고일
     '', // K : 납부
     '', // L : 메디컬
