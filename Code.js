@@ -74,9 +74,9 @@ function setInitialValue(e) {
     // 현황 List 는 미리 준비되어 있어야 한다.
     appendResidence(studentInfo);
   }
-  catch(e) {
+  catch(ex) {
     range.clearContent();
-    range.offset(0, 6, 1, 1).setValue(e);
+    range.offset(0, 6, 1, 1).setValue(ex);
     range.offset(0,-1,1,8).setBackground("Orange");
   }
 }
@@ -134,55 +134,54 @@ function findSkipBed(residenceType) {
  */
 function buildInvoidByManual(studentId, roomCode){
   //
-  var lastRow = listsSheet.getLastRow() + 1;
-  var range = listsSheet.getRange(lastRow, 1);
-  range.setValue(new Date());  
-  range = range.offset(0, 1, 1, 1);
-  range.setValue(studentId);
-  
+  var lastRow = listsSheet.getLastRow();
   try {
     var studentInfo = getStudentInfo(studentId);
     if(studentInfo == undefined) {
       throw new Error("Can Not Find Your StudentId [" + studentId + "]");
-    }    
+    }
+    //
+    // @todo 방 중복 배정 확인 필요.
+    //
     studentInfo.assignedRoom = roomCode;
     studentInfo.isPreAssigned = true;
-    //
-    var modified_pdf_url = doBuild(range, studentInfo, 'M');
     //
     // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
     //
     dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
       if(value[0] == studentId){
-        dataSheet.getRange(index + 2, 7).setValue(roomCode);
+        // index 는 0 부터, 추가 1 은 1번행은 title
+        dataSheet.getRange("H" + (index + 2)).setValue(roomCode);
       }
     });
     //
     // 앞서서 Survey 진행한 정보에서 학생의 new roomCode, modified_pdf_url 을 설정한다.
     //
-    listsSheet.getRange("B2:B" + (lastRow -1)).getValues().forEach((value, index) => {
+    listsSheet.getRange("B2:B" + lastRow).getValues().forEach((value, index) => {
       if(value == studentId){
-        // timestamp
-        listsSheet.getRange(index + 2, 1, 1, 1).setValue(new Date());
-        // roomCode
-        listsSheet.getRange(index + 2, 5, 1, 1).setValue(roomCode);
-        // doomfee
-        listsSheet.getRange(index + 2, 6, 1, 1).setValue(studentInfo.dormFee);
-        // modifiedPdfUrl
-        listsSheet.getRange(index + 2, 8, 1, 1).setValue(modified_pdf_url);
-        listsSheet.getRange(index + 2, 1, 1, 8).setBackground("#e0e0e0");
+        //
+        var range = listsSheet.getRange("B" + (index + 2));
+        var modified_pdf_url = doBuild(range, studentInfo, 'M');
+        range.offset(0, 7, 1, 1).setValue(new Date());
+        range.offset(0, -1, 1, 9).setBackground("#e0e0e0");
       }
     });
-    // M 을 지운다.
-    listsSheet.deleteRow(lastRow);
     //
     // Residence data 를 update 한다.
     //
     updateResidence(studentInfo);
   }
-  catch(e) {
-    range.offset(0, 6, 1, 1).setValue(e);
+  catch(ex) {
+    listsSheet.getRange("B2:B" + lastRow).getValues().forEach((value, index) => {
+      if(value == studentId){
+        // modified date
+        listsSheet.getRange(index + 2, 9, 1, 1).setValue(new Date());        
+        // exception
+        listsSheet.getRange(index + 2, 8, 1, 1).setValue(ex);
+        listsSheet.getRange(index + 2, 1, 1, 8).setBackground("#Orange");
+      }
+    });    
   }
 }
 
@@ -216,8 +215,8 @@ function buildInvoicePdf(studentInfo) {
     ws.toast("방 변경 Invoice 를 생성하였습니다.", '', 2);
     return url;
   }
-  catch(e) {
-    return e;
+  catch(ex) {
+    return ex;
   }
 }
 
@@ -478,15 +477,33 @@ function appendResidence(studentInfo) {
     if(array.join('') == studentInfo.assignedRoom) {
       residenceListSheet.getRange("D" + (index + 3) + ":Q" + (index + 3)).setValues(rowData);
     }
-  })
+  });
 }
 
 /**
- * ResidenceList 에 student 를 변경한다.
+ * ResidenceList 에 student 정보를 변경한다.
  * @param {Object} studentInfo
  */
 function updateResidence(studentInfo) {
-  // @todo need implements
+  //
+  //
+  var oldData;
+  // 기존 정보를 구해서
+  var lastLow = residenceListSheet.getLastRow();
+  residenceListSheet.getRange("E3:E" + lastLow).getValues().forEach((array, index) => {
+    if(array[0] == studentInfo.studentId) {
+      var range = residenceListSheet.getRange("E" + (index + 3) + ":U" + (index + 3));
+      oldData = range.getValues();
+      range.clearContent();
+    }
+  });
+
+  // 새 위치로 이동 시킨다.
+  residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
+    if(array.join('') == studentInfo.assignedRoom) {
+      residenceListSheet.getRange("E" + (index + 3) + ":U" + (index + 3)).setValues(oldData);
+    }
+  });  
 }
 
 /**
