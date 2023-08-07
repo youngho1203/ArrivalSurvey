@@ -23,16 +23,16 @@ const templateSheet = ws.getSheetByName("Template");
 // 현황 List Unique ID : Arrival Survey 를 입사생이 진행하면, 그 결과를 기숙사 현황 List 에도 같이 등록하기 위한 현황 List ID
 // 광개토관 기숙사 : 0. 광개토관 기숙사 현황 ID
 // 외부 기숙사 : 
-const RESIDENCE_LIST_ID = '19eaIfuIvedUCf0l2V_ZbcP6hfFqmFNWI2sfW1OVWUig';
+const RESIDENCE_LIST_ID = '1rDZ2t9fJUX8iJZsjF2gGHSWSvl1_X42Ji89-gK4H9PU';
 // 현황 SpreadSheet ( 사전에 만들어져 있어야 한다. )
 const residenceListSheet = SpreadsheetApp.openById(RESIDENCE_LIST_ID);
 // 현황 SpreadSheet 현재 진행 Tab Name ( 사전에 설정되어 있어야 한다. )
 const currentListName = residenceListSheet.getSheetByName("Config").getRange("K2").getValue();
 
 // 허용 입사 학생 총 수
-const numberOfData = dataSheet.getLastRow() - 1;
+const numberOfData = dataSheet.getLastRow();
 // 입사 가능 방 총 수
-const availableRooms = configSheet.getLastRow() -1;
+const availableRooms = configSheet.getLastRow();
 // configSheet 에서 nextRoomCode Column number
 const nextRoomCodeColumn = 8;
 // 입실 가능한 방이 꽉 찼을 때 
@@ -50,11 +50,14 @@ const FULL_ROOMS = "FULL";
  * @param {Object} survey event object
  */
 function setInitialValue(e) {
+  if(!e){
+    return;
+  }
+  //
+  var range = e.range.offset(0,1, 1, 1);
   try {
-    var range = e.range.offset(0,1, 1, 1);
     var studentId = range.getValue();
     if(deDupeCheck(studentId) !== undefined){
-      // console.log(deDupeCheck(studentId));
       throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
     var studentInfo = getStudentInfo(studentId);
@@ -69,14 +72,13 @@ function setInitialValue(e) {
     var values = e.range.getValues()[0];
     studentInfo.email = values[2];
     studentInfo.phone = values[3];
-    // console.log("Now add to 현황 List : ", studentInfo);
     //
     // 현황 List 는 미리 준비되어 있어야 한다.
     appendResidence(studentInfo);
   }
   catch(ex) {
     range.clearContent();
-    range.offset(0, 6, 1, 1).setValue(ex);
+    range.offset(0, 6, 1, 1).setValue(ex.stack);
     range.offset(0,-1,1,8).setBackground("Orange");
   }
 }
@@ -149,7 +151,7 @@ function buildInvoidByManual(studentId, roomCode){
     // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
     //
-    dataSheet.getRange("A2:A" + (1 + numberOfData)).getValues().forEach((value, index) => {
+    dataSheet.getRange("A2:A" + numberOfData).getValues().forEach((value, index) => {
       if(value[0] == studentId){
         // index 는 0 부터, 추가 1 은 1번행은 title
         dataSheet.getRange("H" + (index + 2)).setValue(roomCode);
@@ -285,7 +287,7 @@ function setDormitoryInfo(residenceType, studentInfo) {
   // 침대는 최대 9개 미만 ( 알파벳 한자리 )
   var str_length = studentInfo.assignedRoom.length;
   var roomNumber = studentInfo.assignedRoom.substring(0,str_length - 1);
-  configSheet.getRange("B2:B" + (1+ availableRooms)).getValues().forEach((room, index) => {
+  configSheet.getRange("B2:B" + availableRooms).getValues().forEach((room, index) => {
     // white space 제거, human error 를 방지
     if(room[0].toString().replace(/\s/g, "") == roomNumber.replace(/\s/g, "")){
       var roomInfo = configSheet.getRange("A" + (2 + index) + ":D" + (2 + index)).getValues()[0];
@@ -334,7 +336,7 @@ function updateNextRoomNumberCode(row, studentInfo) {
   else {
    nextRoomCode = findNextCode(roomNumber, bedCode);
     // 미리 할당된 침대인지 dataSheet 확인
-    dataSheet.getRange("G2:G" + (1+ numberOfData)).getValues().forEach(value => {
+    dataSheet.getRange("G2:G" + numberOfData).getValues().forEach(value => {
       if(value == nextRoomCode){
         // 이미 할당된 침대이면 다음 침대
         roomNumber = nextRoomCode.substring(0, nextRoomCode.length -1);
@@ -361,7 +363,7 @@ function isLastRoom(row, nextRoomCode) {
  */
 function findNextCode(roomNumber, bedCode) { 
   var nextRoom, nextCode; 
-  configSheet.getRange("B2:B" + (1+ availableRooms)).getValues().forEach((room, index) => {
+  configSheet.getRange("B2:B" + availableRooms).getValues().forEach((room, index) => {
     if(room == roomNumber){
       // index 는 0 부터, 따라서 C2 부터 
       var bedArray = configSheet.getRange("C" + (2 + index) ).getValue().split(',');
@@ -424,7 +426,7 @@ function getStudentInfo(studentId) {
     }
   });
   if(studentData){
-    var isAssigned = studentData[6] == '' ? false : true;
+    var isAssigned = studentData[7] == '' ? false : true;
     return { 
       'studentId':studentData[0], 
       'name':studentData[1], 
@@ -476,7 +478,7 @@ function appendResidence(studentInfo) {
     studentInfo.email, // Q : 이메일
     checkinDate // 입사일
   ]];
-  // console.log(studentInfo);
+  console.log(rowData);
   var lastLow = residenceListSheet.getLastRow();
   residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
