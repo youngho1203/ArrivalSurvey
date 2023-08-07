@@ -27,7 +27,7 @@ const RESIDENCE_LIST_ID = '19eaIfuIvedUCf0l2V_ZbcP6hfFqmFNWI2sfW1OVWUig';
 // 현황 SpreadSheet ( 사전에 만들어져 있어야 한다. )
 const residenceListSheet = SpreadsheetApp.openById(RESIDENCE_LIST_ID);
 // 현황 SpreadSheet 현재 진행 Tab Name ( 사전에 설정되어 있어야 한다. )
-const currentListName = configSheet.getRange("T2").getValue();
+const currentListName = residenceListSheet.getSheetByName("Config").getRange("K2").getValue();
 
 // 허용 입사 학생 총 수
 const numberOfData = dataSheet.getLastRow() - 1;
@@ -455,6 +455,10 @@ function getStudentInfo(studentId) {
  * @param {Object} studentInfo
  */
 function appendResidence(studentInfo) {
+  //
+  let paied = studentInfo.isFree ? 'o' : '';
+  let checkinDate = studentInfo.isFree ? new Date().toISOString().substring(0, 10) : '';
+
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
     studentInfo.studentId, // E : 학번
@@ -463,19 +467,20 @@ function appendResidence(studentInfo) {
     studentInfo.gender, // H : 성별
     studentInfo.birthday, // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
     '', // J : 입사 보고일
-    '', // K : 납부
+    paied, // K : 납부
     '', // L : 메디컬
     '', // M : Gen Mode 
     '', // N : 시설 점검표
     '', // O : 연장여부
     studentInfo.phone, // P : 핸드폰
-    studentInfo.email // Q : 이메일
+    studentInfo.email, // Q : 이메일
+    checkinDate // 입사일
   ]];
   // console.log(studentInfo);
   var lastLow = residenceListSheet.getLastRow();
   residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
-      residenceListSheet.getRange("D" + (index + 3) + ":Q" + (index + 3)).setValues(rowData);
+      residenceListSheet.getRange("D" + (index + 3) + ":R" + (index + 3)).setValues(rowData);
     }
   });
 }
