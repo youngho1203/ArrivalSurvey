@@ -103,12 +103,14 @@ function deDupeCheck(studentId) {
 function findSkipBed(residenceType) {
   //
   // 학번이 공란이 것을 확인한다.
-  var skipBedCode = '';  
+  var skipBedCode = '';
+  var isFull = false;
   // [nextCode, firstCode] array
   var code_range = configSheet.getRange(residenceType, nextRoomCodeColumn, 1, 2).getValues()[0];
   if(code_range[0] === FULL_ROOMS){
-    // 더 이상 진행하지 않는다. 
-    return skipBedCode;
+    // 설정된 마지막 방으로  
+    isFull = true;
+    code_range[0] = configSheet.getRange(residenceType, nextRoomCodeColumn + 2, 1, 1).getValue();
   }
   // residenceType 별 row range 를 구한다.
   var startRow;
@@ -119,8 +121,8 @@ function findSkipBed(residenceType) {
       startRow = index + 3;
     }
     else if(value.join('') == code_range[0]) {
-      // nextCode 바로 전 까지만 확인 
-      lastRow = index + 2;
+      // full 이 아니면 nextCode 바로 전 까지만 확인 
+      lastRow = isFull ? index + 3 : index + 2;
     }
   });
   //
@@ -261,6 +263,7 @@ function setRoomNumberCode(studentInfo) {
   else {
     nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
     var skipBed = findSkipBed(row);
+    console.log("Next BED : ", nextRoomCode, skipBed);
     if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
       throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
     }
