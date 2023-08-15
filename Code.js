@@ -27,7 +27,8 @@ const RESIDENCE_LIST_ID = '1rDZ2t9fJUX8iJZsjF2gGHSWSvl1_X42Ji89-gK4H9PU';
 // 현황 SpreadSheet ( 사전에 만들어져 있어야 한다. )
 const residenceListSheet = SpreadsheetApp.openById(RESIDENCE_LIST_ID);
 // 현황 SpreadSheet 현재 진행 Tab Name ( 사전에 설정되어 있어야 한다. )
-const currentListName = residenceListSheet.getSheetByName("Config").getRange("K2").getValue();
+const checkInListsName = residenceListSheet.getSheetByName("Config").getRange("J2").getValue();
+const checkInList = residenceListSheet.getSheetByName(checkInListsName);
 
 // 허용 입사 학생 총 수
 const numberOfData = dataSheet.getLastRow();
@@ -100,14 +101,20 @@ function deDupeCheck(studentId) {
  * @param residenceType
  */
 function findSkipBed(residenceType) {
+  //
+  // 학번이 공란이 것을 확인한다.
+  var skipBedCode = '';  
   // [nextCode, firstCode] array
   var code_range = configSheet.getRange(residenceType, nextRoomCodeColumn, 1, 2).getValues()[0];
-  currentList = residenceListSheet.getSheetByName(currentListName);
+  if(code_range[0] === FULL_ROOMS){
+    // 더 이상 진행하지 않는다. 
+    return skipBedCode;
+  }
   // residenceType 별 row range 를 구한다.
   var startRow;
   var lastRow;
-  var totalLastRow = currentList.getLastRow();
-  currentList.getRange("B3:C" + totalLastRow).getValues().forEach((value, index) => {
+  var totalLastRow = checkInList.getLastRow();
+  checkInList.getRange("B3:C" + totalLastRow).getValues().forEach((value, index) => {
     if(value.join('') == code_range[1]) {
       startRow = index + 3;
     }
@@ -116,14 +123,12 @@ function findSkipBed(residenceType) {
       lastRow = index + 2;
     }
   });
-
-  // 학번이 공란이 것을 확인한다.
-  var skipBedCode = '';
-  currentList.getRange("A" + startRow + ":E" + lastRow).getValues().forEach((value,index) => { 
+  //
+  checkInList.getRange("A" + startRow + ":E" + lastRow).getValues().forEach((value,index) => { 
     if(value[4] == '' && skipBedCode == '') {
       // 해당 bed 정보를 return
       // 순번은 1부터 순차적으로 증가하여야 한다.
-      skipBedCode = currentList.getRange(value[0] + 2, 2, 1, 2).getValues()[0].join('');
+      skipBedCode = checkInList.getRange(value[0] + 2, 2, 1, 2).getValues()[0].join('');
     }
   });
   return skipBedCode;
@@ -254,12 +259,13 @@ function setRoomNumberCode(studentInfo) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
   }
   else {
-    if(nextRoomCode === FULL_ROOMS) {
+    nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
+    var skipBed = findSkipBed(row);
+    if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
       throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
     }
     else {
       // skipBed 가 존재하면, skipBed 로 설정한다.
-      var skipBed = findSkipBed(row);
       if(!isCellEmpty(skipBed)) {
         studentInfo.assignedRoom = skipBed;
         studentInfo.isPreAssigned = true;
@@ -459,8 +465,8 @@ function getStudentInfo(studentId) {
 function appendResidence(studentInfo) {
   //
   let paied = studentInfo.isFree ? 'o' : '';
-  let checkinDate = studentInfo.isFree ? new Date().toISOString().substring(0, 10) : '';
-
+  let checkinDate = studentInfo.isFree ? _getNowDateISOFormattedString() : '';
+  //
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
     studentInfo.studentId, // E : 학번
@@ -476,39 +482,41 @@ function appendResidence(studentInfo) {
     '', // O : 연장여부
     studentInfo.phone, // P : 핸드폰
     studentInfo.email, // Q : 이메일
-    checkinDate // 입사일
+    checkinDate, // 입사일 
+    '', // 퇴실일	
+    '', // 퇴실 정검표	
+    _getNowDateISOFormattedString() // 도착일
   ]];
-  console.log(rowData);
-  var lastLow = residenceListSheet.getLastRow();
-  residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
+  // console.log(rowData);
+  var lastLow = checkInList.getLastRow();
+  checkInList.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
-      residenceListSheet.getRange("D" + (index + 3) + ":R" + (index + 3)).setValues(rowData);
+      checkInList.getRange("D" + (index + 3) + ":U" + (index + 3)).setValues(rowData);
     }
   });
 }
 
 /**
- * ResidenceList 에 student 정보를 변경한다.
+ * CheckInList 에 student 정보를 변경한다.
  * @param {Object} studentInfo
  */
 function updateResidence(studentInfo) {
   //
-  //
   var oldData;
   // 기존 정보를 구해서
-  var lastLow = residenceListSheet.getLastRow();
-  residenceListSheet.getRange("E3:E" + lastLow).getValues().forEach((array, index) => {
+  var lastLow = checkInList.getLastRow();
+  checkInList.getRange("E3:E" + lastLow).getValues().forEach((array, index) => {
     if(array[0] == studentInfo.studentId) {
-      var range = residenceListSheet.getRange("E" + (index + 3) + ":U" + (index + 3));
+      var range = checkInList.getRange("E" + (index + 3) + ":U" + (index + 3));
       oldData = range.getValues();
       range.clearContent();
     }
   });
 
   // 새 위치로 이동 시킨다.
-  residenceListSheet.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
+  checkInList.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
-      residenceListSheet.getRange("E" + (index + 3) + ":U" + (index + 3)).setValues(oldData);
+      checkInList.getRange("E" + (index + 3) + ":U" + (index + 3)).setValues(oldData);
     }
   });  
 }
