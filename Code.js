@@ -467,6 +467,7 @@ function appendResidence(studentInfo) {
   let now = new Date();
   let paied = studentInfo.isFree ? 'o' : '';
   let checkinDate = studentInfo.isFree ? _getNowDateISOFormattedString(now) : '';
+  let checkinDateTime = studentInfo.isFree ? now.toString() : '';
   //
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
@@ -487,13 +488,14 @@ function appendResidence(studentInfo) {
     '', // 퇴실일	
     '', // 퇴실 정검표	
     _getNowDateISOFormattedString(now), // 도착일
-    now.toString()  // 도착 시간
+    now.toString(),   // 도착 시간
+    checkinDateTime   // 입사 시간
   ]];
   // console.log(rowData);
   var lastLow = checkInList.getLastRow();
   checkInList.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
-      checkInList.getRange("D" + (index + 3) + ":V" + (index + 3)).setValues(rowData);
+      checkInList.getRange("D" + (index + 3) + ":W" + (index + 3)).setValues(rowData);
     }
   });
 }
