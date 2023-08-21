@@ -46,3 +46,8 @@ function _getISOTimeZoneCorrectedDateString(date) {
   var tzoffset = date.getTimezoneOffset() * 60000; //offset in milliseconds
   return (new Date(date.getTime() - tzoffset)).toISOString().substring(0, 10);
 }
+
+// Returns true if the cell where cellData was read from is empty.
+function isCellEmpty(cellData) {
+  return typeof (cellData) == "string" && cellData == "";
+}

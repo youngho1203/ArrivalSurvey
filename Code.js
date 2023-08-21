@@ -40,10 +40,7 @@ const nextRoomCodeColumn = 8;
 const FULL_ROOMS = "FULL";
 
 /**
- * @TODO : 현황 LIST 에 자동으로 행 입력.
- * @TODO : 생일 Data 추가
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
- * @TODO : 배정 진행시 이 빠진 Bed 를 확인하여 Next 보다 우선 설정.
  * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리 ( NOT FOUND 발생시 InsertArrivalSurvey 로 다시 실시 ?????, 실제 학번을 가지고 있는 학생인지 어떻게 확인???? )
  */
 /**
@@ -263,7 +260,7 @@ function setRoomNumberCode(studentInfo) {
   else {
     nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
     var skipBed = findSkipBed(row);
-    console.log("Next BED : ", nextRoomCode, skipBed);
+    // console.log("Next BED : ", nextRoomCode, skipBed);
     if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
       throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
     }
@@ -467,8 +464,9 @@ function getStudentInfo(studentId) {
  */
 function appendResidence(studentInfo) {
   //
+  let now = new Date();
   let paied = studentInfo.isFree ? 'o' : '';
-  let checkinDate = studentInfo.isFree ? _getNowDateISOFormattedString() : '';
+  let checkinDate = studentInfo.isFree ? _getNowDateISOFormattedString(now) : '';
   //
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
@@ -488,13 +486,14 @@ function appendResidence(studentInfo) {
     checkinDate, // 입사일 
     '', // 퇴실일	
     '', // 퇴실 정검표	
-    _getNowDateISOFormattedString() // 도착일
+    _getNowDateISOFormattedString(now), // 도착일
+    now.toString()  // 도착 시간
   ]];
   // console.log(rowData);
   var lastLow = checkInList.getLastRow();
   checkInList.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
-      checkInList.getRange("D" + (index + 3) + ":U" + (index + 3)).setValues(rowData);
+      checkInList.getRange("D" + (index + 3) + ":V" + (index + 3)).setValues(rowData);
     }
   });
 }
@@ -560,9 +559,4 @@ function createInvoiceForStudent(studentInfo, sheet, ssId) {
   const pdf = createPDF(ssId, sheet, pdfFileName);
 
   return pdf.getUrl();
-}
-
-// Returns true if the cell where cellData was read from is empty.
-function isCellEmpty(cellData) {
-  return typeof (cellData) == "string" && cellData == "";
 }
