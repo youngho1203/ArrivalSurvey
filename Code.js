@@ -55,7 +55,7 @@ function setInitialValue(e) {
   var range = e.range.offset(0,1, 1, 1);
   try {
     var studentId = range.getValue();
-    if(deDupeCheck(studentId) !== undefined){
+    if(deDupeCheck(studentId)){
       throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
     var studentInfo = getStudentInfo(studentId);
@@ -101,9 +101,14 @@ function findSkipBed(residenceType) {
   //
   // 학번이 공란이 것을 확인한다.
   var skipBedCode = '';
-  var isFull = false;
   // [nextCode, firstCode] array
   var code_range = configSheet.getRange(residenceType, nextRoomCodeColumn, 1, 2).getValues()[0];
+  if(code_range[0] == code_range[1]){
+    // 맨처음 시작은 시작, 끝이 동일하다.
+    // 찾지 않는다.
+    return skipBedCode;
+  }
+  let isFull = false;
   if(code_range[0] === FULL_ROOMS){
     // 설정된 마지막 방으로  
     isFull = true;
@@ -511,7 +516,7 @@ function updateResidence(studentInfo) {
   var lastLow = checkInList.getLastRow();
   checkInList.getRange("E3:E" + lastLow).getValues().forEach((array, index) => {
     if(array[0] == studentInfo.studentId) {
-      var range = checkInList.getRange("E" + (index + 3) + ":U" + (index + 3));
+      var range = checkInList.getRange("E" + (index + 3) + ":Z" + (index + 3));
       oldData = range.getValues();
       range.clearContent();
     }
@@ -520,7 +525,7 @@ function updateResidence(studentInfo) {
   // 새 위치로 이동 시킨다.
   checkInList.getRange("B3:C" + lastLow).getValues().forEach((array, index) => {
     if(array.join('') == studentInfo.assignedRoom) {
-      checkInList.getRange("E" + (index + 3) + ":U" + (index + 3)).setValues(oldData);
+      checkInList.getRange("E" + (index + 3) + ":Z" + (index + 3)).setValues(oldData);
     }
   });  
 }

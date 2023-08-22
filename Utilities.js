@@ -22,6 +22,7 @@ function onOpen() {
 }
 
 function getDataFromFormSubmit(form) {
+  // console.log('getDataFromFormSubmit', form);
   buildInvoidByManual(form.studentId, form.code);  
 }
 
