@@ -55,15 +55,21 @@ function setInitialValue(e) {
   var range = e.range.offset(0,1, 1, 1);
   try {
     var studentId = range.getValue();
+    /**
     if(deDupeCheck(studentId)){
       throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
+    */
     var studentInfo = getStudentInfo(studentId);
     if(studentInfo == undefined) {
       throw new Error("Can Not Find Your StudentId [" + studentId + "]");
     } 
     //
     doBuild(range, studentInfo, 'A');
+    //
+    // Cleans up and creates PDF.
+    SpreadsheetApp.flush();
+    Utilities.sleep(500); // Using to offset any potential latency  
     //
     // 현황 List 에 내용을 추가한다.
     //
@@ -470,11 +476,6 @@ function getStudentInfo(studentId) {
 function appendResidence(studentInfo) {
   //
   let now = new Date();
-  let paied = studentInfo.isFree ? 'o' : '';
-  let checkinDate = studentInfo.isFree ? _getNowDateISOFormattedString(now) : '';
-  // default fee 가 free or not 관계없이 있다.
-  let checkinDateTime = '';
-  //
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
     studentInfo.studentId, // E : 학번
@@ -483,19 +484,19 @@ function appendResidence(studentInfo) {
     studentInfo.gender, // H : 성별
     studentInfo.birthday, // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
     '', // J : 입사 보고일
-    paied, // K : 납부
+    '', // K : 납부
     '', // L : 메디컬
     '', // M : Gen Mode 
     '', // N : 시설 점검표
     '', // O : 연장여부
     studentInfo.phone, // P : 핸드폰
     studentInfo.email, // Q : 이메일
-    checkinDate, // 입사일 
+    '', // 입사일 
     '', // 퇴실일	
     '', // 퇴실 정검표	
     _getNowDateISOFormattedString(now), // 도착일
     now.toString(),   // 도착 시간
-    checkinDateTime   // 입사 시간
+    ''   // 입사 시간
   ]];
   // console.log(rowData);
   var lastLow = checkInList.getLastRow();
