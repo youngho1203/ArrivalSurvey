@@ -472,7 +472,8 @@ function appendResidence(studentInfo) {
   let now = new Date();
   let paied = studentInfo.isFree ? 'o' : '';
   let checkinDate = studentInfo.isFree ? _getNowDateISOFormattedString(now) : '';
-  let checkinDateTime = studentInfo.isFree ? now.toString() : '';
+  // default fee 가 free or not 관계없이 있다.
+  let checkinDateTime = '';
   //
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
