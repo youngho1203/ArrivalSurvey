@@ -157,11 +157,21 @@ function buildInvoidByManual(studentId, roomCode){
     if(studentInfo == undefined) {
       throw new Error("Can Not Find Your StudentId [" + studentId + "]");
     }
+    if(!roomCode.match(/(13|14)\d{2}[A-Z]/)){
+      throw new Error("Wrong Room Code", roomCode);
+    }
     //
     // @todo 방 중복 배정 확인 필요.
     //
+    //
     studentInfo.assignedRoom = roomCode;
     studentInfo.isPreAssigned = true;
+    // 만약 배정 roomCode 가 nextAssignedRoomCode 와 동일하면 nextAssignedRoomCode 를 하나 증가 시킨다.
+    let row = findResidenceType(studentInfo);
+    let nextAssignedRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
+    if(roomCode == nextAssignedRoomCode) {
+      updateNextRoomNumberCode(row, studentInfo);
+    }
     //
     // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
     // ( findNextCode 로직을 동일하게 유지시킨다. ) 
@@ -238,14 +248,14 @@ function buildInvoicePdf(studentInfo) {
 }
 
 /**
- * @param {Object} studentInfo
+ * 학생 정보로 부터 거주유형 를 찾는다.
  */
-function setRoomNumberCode(studentInfo) {
+function findResidenceType(studentInfo) {
   var gender= studentInfo.gender;
   var isExchangeStudent = studentInfo.isExchangeStudent;
   // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
   // row 는 residence type 이다.
-  var nextRoomCode, row; 
+  let row; 
   if(gender.startsWith('F')) {
     // female
     if(isExchangeStudent) {
@@ -264,6 +274,17 @@ function setRoomNumberCode(studentInfo) {
       row = 5;
     }
   }
+  return row;
+}
+
+/**
+ * @param {Object} studentInfo
+ */
+function setRoomNumberCode(studentInfo) {
+  // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
+  // row 는 residence type 이다. 
+  let row = findResidenceType(studentInfo);
+  let nextRoomCode;
   //
   if(studentInfo.isPreAssigned) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
