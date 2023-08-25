@@ -40,6 +40,7 @@ const nextRoomCodeColumn = 8;
 const FULL_ROOMS = "FULL";
 
 /**
+ * @TODO : 동작 오류 ? : survey 1번에 3번 진행됨 ( 상황을 알 수 없슴.)
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
  * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리 ( NOT FOUND 발생시 InsertArrivalSurvey 로 다시 실시 ?????, 실제 학번을 가지고 있는 학생인지 어떻게 확인???? )
  */
@@ -68,8 +69,8 @@ function setInitialValue(e) {
     doBuild(range, studentInfo, 'A');
     //
     // Cleans up and creates PDF.
-    SpreadsheetApp.flush();
-    Utilities.sleep(500); // Using to offset any potential latency  
+    // SpreadsheetApp.flush();
+    // Utilities.sleep(500); // Using to offset any potential latency  
     //
     // 현황 List 에 내용을 추가한다.
     //
