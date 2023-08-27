@@ -38,8 +38,11 @@ const availableRooms = configSheet.getLastRow();
 const nextRoomCodeColumn = 8;
 // 입실 가능한 방이 꽉 찼을 때 
 const FULL_ROOMS = "FULL";
+// 현재 진행중인 등록 수
+// let RUNNER =0;
 
 /**
+ * @TODO : nextRoomCode 가 중복되는 문제 ( 동시성 문제가 존재하고 있다. Promise 로 해결될 수 있을까? )
  * @TODO : 동작 오류 ? : survey 1번에 3번 진행됨 ( 상황을 알 수 없슴.)
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
  * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리 ( NOT FOUND 발생시 InsertArrivalSurvey 로 다시 실시 ?????, 실제 학번을 가지고 있는 학생인지 어떻게 확인???? )
@@ -52,6 +55,13 @@ function setInitialValue(e) {
   if(!e){
     return;
   }
+  /**
+  while(RUNNER > 0) {
+    console.log("RUNNER COUNT", RUNNER);
+    sleep(500);
+  }
+  RUNNER++;
+  */
   //
   var range = e.range.offset(0,1, 1, 1);
   try {
@@ -63,7 +73,7 @@ function setInitialValue(e) {
     */
     var studentInfo = getStudentInfo(studentId);
     if(studentInfo == undefined) {
-      throw new Error("Can Not Find Your StudentId [" + studentId + "]");
+      throw new Error("입력한 학번의 학생을 찾을 수가 없습니다. [" + studentId + "]");
     } 
     //
     doBuild(range, studentInfo, 'A');
@@ -86,6 +96,11 @@ function setInitialValue(e) {
     range.offset(0, 6, 1, 1).setValue(ex.stack);
     range.offset(0,-1,1,8).setBackground("Orange");
   }
+  /**
+  finally {
+    RUNNER--;
+  }
+  */
 }
 
 /**
@@ -291,6 +306,9 @@ function setRoomNumberCode(studentInfo) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
   }
   else {
+    //
+    // @todo make sure synchronized block
+    //
     nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
     var skipBed = findSkipBed(row);
     // console.log("Next BED : ", nextRoomCode, skipBed);
@@ -303,11 +321,8 @@ function setRoomNumberCode(studentInfo) {
         studentInfo.assignedRoom = skipBed;
         studentInfo.isPreAssigned = true;
       }
-      else {      
-        //
-        // @todo make sure synchronized block
-        //
-        nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();      
+      else {
+        // nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();      
         studentInfo.assignedRoom = nextRoomCode;
         updateNextRoomNumberCode(row, studentInfo);
       }
@@ -498,27 +513,28 @@ function getStudentInfo(studentId) {
 function appendResidence(studentInfo) {
   //
   let now = new Date();
+  let type = studentInfo.isExchangeStudent ? 'I' : '';
   rowData = [[
     false, //D : 퇴사 ( CheckBox ) : 퇴사시 Check 하면 해당 Row 를 퇴사한 것으로 변경한다.
-    studentInfo.studentId, // E : 학번
-    studentInfo.name, // F : 이름
-    studentInfo.nationality, // G : 국적
-    studentInfo.gender, // H : 성별
-    studentInfo.birthday, // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
-    '', // J : 입사 보고일
-    '', // K : 납부
-    '', // L : 메디컬
-    '', // M : Gen Mode 
-    '', // N : 시설 점검표
-    '', // O : 연장여부
-    studentInfo.phone, // P : 핸드폰
-    studentInfo.email, // Q : 이메일
-    '', // 입사일 
-    '', // 퇴실일	
-    '', // 퇴실 정검표	
+    studentInfo.studentId,    // E : 학번
+    studentInfo.name,         // F : 이름
+    studentInfo.nationality,  // G : 국적
+    studentInfo.gender,       // H : 성별
+    studentInfo.birthday,     // I : 생년월일 : Cell 자료 서식이 반드시 '날짜' 형식 이어야 한다. ( 거주 증명서 발행시 생일을 'YYYY-MM-DD' 형식으로 출력하기 위함 )
+    '',                       // J : 입사 보고일
+    '',                       // K : 납부
+    '',                       // L : 메디컬
+    type,                     // M : 구분
+    '',                       // N : 시설 점검표
+    '',                       // O : 연장여부
+    studentInfo.phone,        // P : 핸드폰
+    studentInfo.email,        // Q : 이메일
+    '',                       // 입사일 
+    '',                       // 퇴실일	
+    '',                       // 퇴실 정검표	
     _getNowDateISOFormattedString(now), // 도착일
-    now.toString(),   // 도착 시간
-    ''   // 입사 시간
+    now.toString(),           // 도착 시간
+    ''                        // 입사 시간
   ]];
   // console.log(rowData);
   var lastLow = checkInList.getLastRow();
