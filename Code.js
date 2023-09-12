@@ -38,11 +38,9 @@ const availableRooms = configSheet.getLastRow();
 const nextRoomCodeColumn = 8;
 // 입실 가능한 방이 꽉 찼을 때 
 const FULL_ROOMS = "FULL";
-// 현재 진행중인 등록 수
-// let RUNNER =0;
 
 /**
- * @TODO : nextRoomCode 가 중복되는 문제 ( 동시성 문제가 존재하고 있다. Promise 로 해결될 수 있을까? )
+ * @TODO : nextRoomCode 가 중복되는 문제 ( 동시성 문제가 존재하고 있다. PromiseQueue 로 Test 진행 )
  * @TODO : 동작 오류 ? : survey 1번에 3번 진행됨 ( 상황을 알 수 없슴.)
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
  * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리 ( NOT FOUND 발생시 InsertArrivalSurvey 로 다시 실시 ?????, 실제 학번을 가지고 있는 학생인지 어떻게 확인???? )
@@ -55,32 +53,22 @@ function setInitialValue(e) {
   if(!e){
     return;
   }
-  /**
-  while(RUNNER > 0) {
-    console.log("RUNNER COUNT", RUNNER);
-    sleep(500);
-  }
-  RUNNER++;
-  */
   //
   var range = e.range.offset(0,1, 1, 1);
   try {
-    var studentId = range.getValue();
-    /**
-    if(deDupeCheck(studentId)){
+    let studentId = range.getValue();
+    let current_row = ranger.getRow(); 
+    
+    if(deDupeCheck(studentId, current_row)){
       throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
-    */
+    
     var studentInfo = getStudentInfo(studentId);
     if(studentInfo == undefined) {
       throw new Error("입력한 학번의 학생을 찾을 수가 없습니다. [" + studentId + "]");
     } 
     //
     doBuild(range, studentInfo, 'A');
-    //
-    // Cleans up and creates PDF.
-    // SpreadsheetApp.flush();
-    // Utilities.sleep(500); // Using to offset any potential latency  
     //
     // 현황 List 에 내용을 추가한다.
     //
@@ -96,21 +84,17 @@ function setInitialValue(e) {
     range.offset(0, 6, 1, 1).setValue(ex.stack);
     range.offset(0,-1,1,8).setBackground("Orange");
   }
-  /**
-  finally {
-    RUNNER--;
-  }
-  */
 }
 
 /**
  * dedupe check for duplication checkin
  * Survey Response List 에서만 확인한다.
+ * @param studentId
+ * @param current_row : 현재 처리중인 row ( form 에서 등록됨으로 event range 에서 읽어 넣어야 한다.)
  */
-function deDupeCheck(studentId) {
+function deDupeCheck(studentId, current_row) {
   // lastRow 는 지금 진행하고 있는 것. 바로 직전까지만 처리
-  var lastRow = listsSheet.getLastRow() -1;
-  var range = listsSheet.getRange("B2:B" + lastRow);
+  var range = listsSheet.getRange("B2:B" + (current_row -1));
   return range.getValues().find( id => { return id[0] === studentId });
 }
 
