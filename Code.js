@@ -374,7 +374,7 @@ function updateNextRoomNumberCode(row, studentInfo) {
   else {
    nextRoomCode = findNextCode(roomNumber, bedCode);
     // 미리 할당된 침대인지 dataSheet 확인
-    dataSheet.getRange("G2:G" + numberOfData).getValues().forEach(value => {
+    dataSheet.getRange("H2:H" + numberOfData).getValues().forEach(value => {
       if(value == nextRoomCode){
         // 이미 할당된 침대이면 다음 침대
         roomNumber = nextRoomCode.substring(0, nextRoomCode.length -1);
