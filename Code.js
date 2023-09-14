@@ -41,9 +41,7 @@ const FULL_ROOMS = "FULL";
 
 /**
  * @TODO : nextRoomCode 가 중복되는 문제 ( 동시성 문제가 존재하고 있다. PromiseQueue 로 Test 진행 )
- * @TODO : 동작 오류 ? : survey 1번에 3번 진행됨 ( 상황을 알 수 없슴.)
  * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
- * @TODO : Data 명단에 없는 학생 등록을 진행할 때 처리 ( NOT FOUND 발생시 InsertArrivalSurvey 로 다시 실시 ?????, 실제 학번을 가지고 있는 학생인지 어떻게 확인???? )
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
@@ -57,16 +55,17 @@ function setInitialValue(e) {
   var range = e.range.offset(0,1, 1, 1);
   try {
     let studentId = range.getValue();
-    let current_row = ranger.getRow(); 
-    
-    if(deDupeCheck(studentId, current_row)){
-      throw new Error("[" + studentId + "] is Aleady CheckIn");
-    }
-    
     var studentInfo = getStudentInfo(studentId);
     if(studentInfo == undefined) {
       throw new Error("입력한 학번의 학생을 찾을 수가 없습니다. [" + studentId + "]");
     } 
+
+    //    
+    let current_row = range.getRow(); 
+    if(deDupeCheck(studentId, current_row)){
+      throw new Error("[" + studentId + "] is Aleady CheckIn");
+    }
+    
     //
     doBuild(range, studentInfo, 'A');
     //
@@ -282,8 +281,7 @@ function findResidenceType(studentInfo) {
  */
 function setRoomNumberCode(studentInfo) {
   // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
-  // row 는 residence type 이다. 
-  let row = findResidenceType(studentInfo);
+  let residenceType = findResidenceType(studentInfo);
   let nextRoomCode;
   //
   if(studentInfo.isPreAssigned) {
@@ -291,28 +289,38 @@ function setRoomNumberCode(studentInfo) {
   }
   else {
     //
-    // @todo make sure synchronized block
+    // checkInList 에 변경이 완료될 때 까지 충분한 시간이 필요하다.
     //
-    nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
-    var skipBed = findSkipBed(row);
-    // console.log("Next BED : ", nextRoomCode, skipBed);
-    if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
-      throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
+    while(isRunning(residenceType)) {
+      SpreadsheetApp.flush();
+      Utilities.sleep(10000);
     }
-    else {
-      // skipBed 가 존재하면, skipBed 로 설정한다.
-      if(!isCellEmpty(skipBed)) {
-        studentInfo.assignedRoom = skipBed;
-        studentInfo.isPreAssigned = true;
+
+    setRunningValue(studentInfo.studentId, residenceType, true);
+    //
+    try {
+      nextRoomCode = configSheet.getRange(residenceType, nextRoomCodeColumn).getValue();
+      var skipBed = findSkipBed(residenceType);
+      if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
+        throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
       }
       else {
-        // nextRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();      
-        studentInfo.assignedRoom = nextRoomCode;
-        updateNextRoomNumberCode(row, studentInfo);
+        // skipBed 가 존재하면, skipBed 로 설정한다.
+        if(!isCellEmpty(skipBed)) {
+          studentInfo.assignedRoom = skipBed;
+          studentInfo.isPreAssigned = true;
+        }
+        else {     
+          studentInfo.assignedRoom = nextRoomCode;
+          updateNextRoomNumberCode(residenceType, studentInfo);
+        }
       }
     }
+    finally {
+      setRunningValue(studentInfo.studentId, residenceType, false);
+    }
   }
-  setDormitoryInfo(row, studentInfo);
+  setDormitoryInfo(residenceType, studentInfo);
 }
 
 /**
@@ -384,6 +392,11 @@ function updateNextRoomNumberCode(row, studentInfo) {
     });
   }
   configSheet.getRange(row, nextRoomCodeColumn).setValue(nextRoomCode);
+  /**
+   * 아래 flush 와 sleep 는 이유를 알 수 없지만 동시에 event 가 들어올 때 반듯이 필요하다.
+   */
+  SpreadsheetApp.flush();
+  Utilities.sleep(1000);
 }
 
 /**
@@ -419,6 +432,21 @@ function findNextCode(roomNumber, bedCode) {
     }
   });
   return nextRoom + nextCode;
+}
+
+/**
+ * 현재 residenceType 으로 진행이 되고 있는 지 여부 확인
+ */
+function isRunning(residenceType) {
+  return !isCellEmpty(configSheet.getRange("P"+ residenceType).getValue());
+}
+
+/**
+ * 현재 residenceType 으로 진행이 되고 있는지를 설정 한다.
+ */
+function setRunningValue(studentId, residenceType, runOrNot) {
+  let range = configSheet.getRange("P"+ residenceType);
+  runOrNot ? range.setValue(studentId) : range.clearContent();
 }
 
 /**
