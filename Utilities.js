@@ -52,3 +52,10 @@ function _getISOTimeZoneCorrectedDateString(date) {
 function isCellEmpty(cellData) {
   return typeof (cellData) == "string" && cellData == "";
 }
+
+/**
+ * simple sleep using promise
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}

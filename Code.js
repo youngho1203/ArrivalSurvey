@@ -41,42 +41,59 @@ const FULL_ROOMS = "FULL";
 
 /**
  * @TODO : nextRoomCode 가 중복되는 문제 ( 동시성 문제가 존재하고 있다. PromiseQueue 로 Test 진행 )
- * @TODO : 하나의 BED 에 중복 배정 방지 Check 도입
+ * @TODO : 방배정 수정 BUG ( 수정된 방이 NEXT_ROOM_CODE 와 동일할 때, NEXT_ROOM_CODE 도 같이 수정 필요 )
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
  * @param {Object} survey event object
  */
-function setInitialValue(e) {
+ function setInitialValue(e) {
   if(!e){
     return;
   }
   //
-  var range = e.range.offset(0,1, 1, 1);
+  let range = e.range.offset(0,1,1,1); 
   try {
+    //
     let studentId = range.getValue();
-    var studentInfo = getStudentInfo(studentId);
+    //
+    let studentInfo = getStudentInfo(studentId);
     if(studentInfo == undefined) {
       throw new Error("입력한 학번의 학생을 찾을 수가 없습니다. [" + studentId + "]");
-    } 
-
-    //    
-    let current_row = range.getRow(); 
-    if(deDupeCheck(studentId, current_row)){
-      throw new Error("[" + studentId + "] is Aleady CheckIn");
     }
-    
     //
-    doBuild(range, studentInfo, 'A');
-    //
-    // 현황 List 에 내용을 추가한다.
-    //
-    var values = e.range.getValues()[0];
-    studentInfo.email = values[2];
-    studentInfo.phone = values[3];
-    //
-    // 현황 List 는 미리 준비되어 있어야 한다.
-    appendResidence(studentInfo);
+    // checkInList 에 변경이 완료될 때 까지 충분한 시간이 필요하다.
+    // 아래의 while 문으로는 race condition 을 막을 수 없다.
+    // 개선 필요....
+    // ( 종료 event 가 없어서 PromiseQueue 도 동일 문제를 여전히 가지고 있다. )
+    let residenceType = findResidenceType(studentInfo);
+    while(isRunning(residenceType)) {
+      SpreadsheetApp.flush();
+      Utilities.sleep(10000);
+    }
+
+    try {
+      setRunningValue(studentInfo, true);
+      //    
+      let current_row = range.getRow();
+      if(deDupeCheck(studentId, current_row) !== undefined){
+        throw new Error("[" + studentId + "] 는 이미 등록된 학생입니다.");
+      }
+      //
+      doBuild(range, studentInfo, 'A');
+      //
+      // 현황 List 에 내용을 추가한다.
+      //
+      var values = range.getValues()[0];
+      studentInfo.email = values[2];
+      studentInfo.phone = values[3];
+      //
+      // 현황 List 는 미리 준비되어 있어야 한다.
+      appendResidence(studentInfo);
+    }
+    finally {
+      setRunningValue(studentInfo, false);
+    }
   }
   catch(ex) {
     range.clearContent();
@@ -92,8 +109,8 @@ function setInitialValue(e) {
  * @param current_row : 현재 처리중인 row ( form 에서 등록됨으로 event range 에서 읽어 넣어야 한다.)
  */
 function deDupeCheck(studentId, current_row) {
-  // lastRow 는 지금 진행하고 있는 것. 바로 직전까지만 처리
-  var range = listsSheet.getRange("B2:B" + (current_row -1));
+  // row 는 지금 진행하고 있는 것. 바로 직전까지만 처리
+  let range = listsSheet.getRange("B2:B" + (current_row -1));
   return range.getValues().find( id => { return id[0] === studentId });
 }
 
@@ -166,10 +183,11 @@ function buildInvoidByManual(studentId, roomCode){
     studentInfo.assignedRoom = roomCode;
     studentInfo.isPreAssigned = true;
     // 만약 배정 roomCode 가 nextAssignedRoomCode 와 동일하면 nextAssignedRoomCode 를 하나 증가 시킨다.
-    let row = findResidenceType(studentInfo);
-    let nextAssignedRoomCode = configSheet.getRange(row, nextRoomCodeColumn).getValue();
+    findResidenceType(studentInfo);
+    //
+    let nextAssignedRoomCode = configSheet.getRange(studentInfo.residenceType, nextRoomCodeColumn).getValue();
     if(roomCode == nextAssignedRoomCode) {
-      updateNextRoomNumberCode(row, studentInfo);
+      updateNextRoomNumberCode(studentInfo);
     }
     //
     // DataSheet 에 학생의 AssignedRoom 에 Manual 설정값을 기록한다. 
@@ -247,14 +265,14 @@ function buildInvoicePdf(studentInfo) {
 }
 
 /**
- * 학생 정보로 부터 거주유형 를 찾는다.
+ * 학생 정보로 부터 거주유형 를 찾는다. 
+ * Config 의 ResidenceType row number
  */
 function findResidenceType(studentInfo) {
   var gender= studentInfo.gender;
   var isExchangeStudent = studentInfo.isExchangeStudent;
-  // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
   // row 는 residence type 이다.
-  let row; 
+  let row = -1; 
   if(gender.startsWith('F')) {
     // female
     if(isExchangeStudent) {
@@ -273,6 +291,9 @@ function findResidenceType(studentInfo) {
       row = 5;
     }
   }
+  //
+  studentInfo.residenceType = row;
+  //
   return row;
 }
 
@@ -281,7 +302,6 @@ function findResidenceType(studentInfo) {
  */
 function setRoomNumberCode(studentInfo) {
   // next roomCode 는 ConfigSheet 에 기록하여 놓았던 것을 읽는다. ( ID Column 이다. )
-  let residenceType = findResidenceType(studentInfo);
   let nextRoomCode;
   //
   if(studentInfo.isPreAssigned) {
@@ -289,18 +309,11 @@ function setRoomNumberCode(studentInfo) {
   }
   else {
     //
-    // checkInList 에 변경이 완료될 때 까지 충분한 시간이 필요하다.
+    // setRunningValue(studentInfo, true);
     //
-    while(isRunning(residenceType)) {
-      SpreadsheetApp.flush();
-      Utilities.sleep(10000);
-    }
-
-    setRunningValue(studentInfo.studentId, residenceType, true);
-    //
-    try {
-      nextRoomCode = configSheet.getRange(residenceType, nextRoomCodeColumn).getValue();
-      var skipBed = findSkipBed(residenceType);
+    // try {
+      nextRoomCode = configSheet.getRange(studentInfo.residenceType, nextRoomCodeColumn).getValue();
+      var skipBed = findSkipBed(studentInfo.residenceType);
       if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
         throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
       }
@@ -310,25 +323,25 @@ function setRoomNumberCode(studentInfo) {
           studentInfo.assignedRoom = skipBed;
           studentInfo.isPreAssigned = true;
         }
-        else {     
+        else {
           studentInfo.assignedRoom = nextRoomCode;
-          updateNextRoomNumberCode(residenceType, studentInfo);
+          updateNextRoomNumberCode(studentInfo);
         }
       }
-    }
-    finally {
-      setRunningValue(studentInfo.studentId, residenceType, false);
-    }
+    // }
+    // finally {
+      // setRunningValue(studentInfo, false);
+    // }
   }
-  setDormitoryInfo(residenceType, studentInfo);
+  setDormitoryInfo(studentInfo);
 }
 
 /**
  * assignedRoom 정보에서 dormitory 주소, 거주기한, fee 를 얻음.
  */
-function setDormitoryInfo(residenceType, studentInfo) {
+function setDormitoryInfo(studentInfo) {
   // 기숙사 거주 유형별 정보
-  const residenceInfo = getResidenceInfo(residenceType);
+  let residenceInfo = getResidenceInfo(studentInfo.residenceType);
   //
   // 침대는 최대 9개 미만 ( 알파벳 한자리 )
   var str_length = studentInfo.assignedRoom.length;
@@ -365,10 +378,9 @@ function setDormitoryInfo(residenceType, studentInfo) {
 
 /**
  * ConfigSheet 에 Next RoomNumberCode 를 update 한다.
- * @param row number
  * @param {Object} studentInfo
  */
-function updateNextRoomNumberCode(row, studentInfo) {
+function updateNextRoomNumberCode(studentInfo) {
   //
   var roomCode = studentInfo.assignedRoom;
   var roomNumber = roomCode.substring(0, roomCode.length -1);
@@ -376,22 +388,23 @@ function updateNextRoomNumberCode(row, studentInfo) {
 
   // next 침대
   var nextRoomCode;
-  if(isLastRoom(row, studentInfo.assignedRoom)){
+  if(isLastRoom(studentInfo.residenceType, studentInfo.assignedRoom)){
     nextRoomCode = FULL_ROOMS;
   }
   else {
-   nextRoomCode = findNextCode(roomNumber, bedCode);
+    nextRoomCode = findNextCode(roomNumber, bedCode);
     // 미리 할당된 침대인지 dataSheet 확인
     dataSheet.getRange("H2:H" + numberOfData).getValues().forEach(value => {
       if(value == nextRoomCode){
         // 이미 할당된 침대이면 다음 침대
+        // 전체 value 에 대하여 for loop 진행함으로 while 의 효과를 같는다. 
         roomNumber = nextRoomCode.substring(0, nextRoomCode.length -1);
         bedCode =   nextRoomCode.substring(nextRoomCode.length -1, nextRoomCode.length);    
         nextRoomCode = findNextCode(roomNumber, bedCode);
       }
     });
   }
-  configSheet.getRange(row, nextRoomCodeColumn).setValue(nextRoomCode);
+  configSheet.getRange(studentInfo.residenceType, nextRoomCodeColumn).setValue(nextRoomCode);
   /**
    * 아래 flush 와 sleep 는 이유를 알 수 없지만 동시에 event 가 들어올 때 반듯이 필요하다.
    */
@@ -444,9 +457,9 @@ function isRunning(residenceType) {
 /**
  * 현재 residenceType 으로 진행이 되고 있는지를 설정 한다.
  */
-function setRunningValue(studentId, residenceType, runOrNot) {
-  let range = configSheet.getRange("P"+ residenceType);
-  runOrNot ? range.setValue(studentId) : range.clearContent();
+function setRunningValue(studentInfo, runOrNot) {
+  let range = configSheet.getRange("P"+ studentInfo.residenceType);
+  runOrNot ? range.setValue(studentInfo.studentId) : range.clearContent();
 }
 
 /**
@@ -501,18 +514,19 @@ function getStudentInfo(studentId) {
       'birthday': studentData[4],
       'isFree':studentData[5], 
       'isExchangeStudent':studentData[6], 
-      'assignedRoom':studentData[7], // 선 배정된 방
+      'assignedRoom':studentData[7],  // 선 배정된 방
       'isPreAssigned': isAssigned,
-      'dormName': '', // Dorm Name
-      'dormFee':-1, // 기숙사 비
-      'deposit': 0, // deposit money
-      'availableDate': '', // 거주 가능 시작 날짜
-      'dueDate': '', // 거주 종료 날짜
-      'address' :'', // 기숙사 방 주소
-      'paymentPeriod':'', // 기숙사비 납부 일정
-      'aliasPattern': '', // 기숙사 이름 alias pattern
+      'dormName': '',                 // Dorm Name
+      'dormFee':-1,                   // 기숙사 비
+      'deposit': 0,                   // deposit money
+      'availableDate': '',            // 거주 가능 시작 날짜
+      'dueDate': '',                  // 거주 종료 날짜
+      'address' :'',                  // 기숙사 방 주소
+      'paymentPeriod':'',             // 기숙사비 납부 일정
+      'aliasPattern': '',             // 기숙사 이름 alias pattern
       'phone':'',
-      'email':''
+      'email':'',
+      'residenceType':''              // 거주 유형
       };
   }
   return undefined;
