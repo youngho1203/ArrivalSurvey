@@ -40,8 +40,7 @@ const nextRoomCodeColumn = 8;
 const FULL_ROOMS = "FULL";
 
 /**
- * @TODO : nextRoomCode 가 중복되는 문제 ( 동시성 문제가 존재하고 있다. PromiseQueue 로 Test 진행 )
- * @TODO : 방배정 수정 BUG ( 수정된 방이 NEXT_ROOM_CODE 와 동일할 때, NEXT_ROOM_CODE 도 같이 수정 필요 )
+ * @TODO : nextRoomCode 가 중복되는 문제 ( 많이 개선되었지만 근본적으로 아직 race condition 이 존재할 가능성이 있다.)
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
@@ -308,30 +307,22 @@ function setRoomNumberCode(studentInfo) {
     // 수동으로 설정해 놓았으면 처리하지 않는다.
   }
   else {
-    //
-    // setRunningValue(studentInfo, true);
-    //
-    // try {
-      nextRoomCode = configSheet.getRange(studentInfo.residenceType, nextRoomCodeColumn).getValue();
-      var skipBed = findSkipBed(studentInfo.residenceType);
-      if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
-        throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
+    nextRoomCode = configSheet.getRange(studentInfo.residenceType, nextRoomCodeColumn).getValue();
+    var skipBed = findSkipBed(studentInfo.residenceType);
+    if(nextRoomCode === FULL_ROOMS && isCellEmpty(skipBed)) {
+      throw new Error("방이 모두 찾습니다. 더 이상 배정을 할 수 없습니다.");
+    }
+    else {
+      // skipBed 가 존재하면, skipBed 로 설정한다.
+      if(!isCellEmpty(skipBed)) {
+        studentInfo.assignedRoom = skipBed;
+        studentInfo.isPreAssigned = true;
       }
       else {
-        // skipBed 가 존재하면, skipBed 로 설정한다.
-        if(!isCellEmpty(skipBed)) {
-          studentInfo.assignedRoom = skipBed;
-          studentInfo.isPreAssigned = true;
-        }
-        else {
-          studentInfo.assignedRoom = nextRoomCode;
-          updateNextRoomNumberCode(studentInfo);
-        }
+        studentInfo.assignedRoom = nextRoomCode;
+        updateNextRoomNumberCode(studentInfo);
       }
-    // }
-    // finally {
-      // setRunningValue(studentInfo, false);
-    // }
+    }
   }
   setDormitoryInfo(studentInfo);
 }
