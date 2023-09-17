@@ -38,6 +38,8 @@ const availableRooms = configSheet.getLastRow();
 const nextRoomCodeColumn = 8;
 // 입실 가능한 방이 꽉 찼을 때 
 const FULL_ROOMS = "FULL";
+// 현재 진행중인 폼 입력 수
+var RUNNER = 0;
 
 /**
  * @TODO : nextRoomCode 가 중복되는 문제 ( 많이 개선되었지만 근본적으로 아직 race condition 이 존재할 가능성이 있다.)
@@ -58,6 +60,7 @@ const FULL_ROOMS = "FULL";
   //
   let range = e.range.offset(0,1,1,1); 
   try {
+    RUNNER++;
     //
     let studentId = range.getValue();
     //
@@ -72,8 +75,9 @@ const FULL_ROOMS = "FULL";
     // ( 종료 event 가 없어서 PromiseQueue 도 동일 문제를 여전히 가지고 있다. )
     let residenceType = findResidenceType(studentInfo);
     while(isRunning(residenceType)) {
+      let SLEEP_PERIOD = 10000 + RUNNER * 1000;
       SpreadsheetApp.flush();
-      Utilities.sleep(10000);
+      Utilities.sleep(SLEEP_PERIOD);
     }
 
     try {
@@ -103,6 +107,9 @@ const FULL_ROOMS = "FULL";
     range.clearContent();
     range.offset(0, 6, 1, 1).setValue(ex.stack);
     range.offset(0,-1,1,8).setBackground("Orange");
+  }
+  finally {
+    RUNNER--;
   }
 }
 
