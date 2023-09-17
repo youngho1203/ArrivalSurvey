@@ -41,6 +41,11 @@ const FULL_ROOMS = "FULL";
 
 /**
  * @TODO : nextRoomCode 가 중복되는 문제 ( 많이 개선되었지만 근본적으로 아직 race condition 이 존재할 가능성이 있다.)
+ * @TODO : implement ModifiedListener interface
+ *       :     notifiyListeners(range)
+ *       :     registerAsListener()
+ *       :     addedObject(range)
+ *       :     modifiedObject(range)
  */
 /**
  * Arrival Survey 가 등록되면 실행된다.
