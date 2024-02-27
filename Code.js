@@ -122,6 +122,7 @@ var RUNNER = 0;
 function deDupeCheck(studentId, current_row) {
   // row 는 지금 진행하고 있는 것. 바로 직전까지만 처리
   if(current_row == 2) {
+    // 맨 처음 등록은 확인할 필요가 없다.
     return undefined;
   }
   let range = listsSheet.getRange("B2:B" + (current_row -1));
